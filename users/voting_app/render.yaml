@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: Mister_Hitbamas
+    runtime: node
+    buildCommand: npm install && npm run build
+    staticPublishPath: "./dist"
