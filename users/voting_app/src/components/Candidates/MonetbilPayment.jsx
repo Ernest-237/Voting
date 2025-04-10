@@ -40,14 +40,14 @@ const MonetbilPayment = ({
       id: 'CM_MTNMOBILEMONEY', 
       name: 'MTN Mobile Money', 
       code: 'CM_MTNMOBILEMONEY',
-      logo: '/mtn-logo.png', // Remplace par ton chemin de logo
+      logo: '/Mtn-Money-logo.jpeg', // Remplace par ton chemin de logo
       ussd: '*126*1#'
     },
     { 
       id: 'CM_ORANGEMONEY', 
       name: 'Orange Money', 
       code: 'CM_ORANGEMONEY',
-      logo: '/orange-logo.png', // Remplace par ton chemin de logo
+      logo: '/Orange-Money-logo.png', // Remplace par ton chemin de logo
       ussd: '#150*1#'
     }
   ];

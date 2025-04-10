@@ -1,0 +1,80 @@
+{
+    "header": {
+      "menu": {
+        "home": "Home",
+        "candidates": "Candidates",
+        "masters": "Masters",
+        "howToVote": "How to vote",
+        "contact": "Contact"
+      }
+    },
+    "hero": {
+      "title": "MISS & MISTER 2025",
+      "subtitle": "Elect the ambassadors of academic excellence and HITBAMAS values",
+      "cta": "Vote now"
+    },
+    "howToVote": {
+      "title": "How to vote?",
+      "step1": {
+        "title": "Choose your candidate",
+        "desc": "Browse through the profiles of student candidates and select your favorite."
+      },
+      "step2": {
+        "title": "Mobile payment",
+        "desc": "Use MTN Mobile Money or Orange Money to easily validate your vote."
+      },
+      "step3": {
+        "title": "Confirm your vote",
+        "desc": "Validate your choice and support your candidate for the Miss/Master crown."
+      }
+    },
+    "candidates": {
+      "miss": {
+        "title": "Our MISS 2025 Candidates",
+        "subtitle": "Discover the female candidates representing the different departments of HITBAMAS."
+      },
+      "master": {
+        "title": "Our MISTER 2025 Candidates",
+        "subtitle": "Discover the male candidates representing the different departments of HITBAMAS."
+      },
+      "vote": "Vote"
+    },
+    "stats": {
+      "candidates": "Candidates",
+      "totalVotes": "Total votes",
+      "daysLeft": "Days left",
+      "winners": "Winners"
+    },
+    "events": {
+      "title": "Upcoming events",
+      "learnMore": "Learn more"
+    },
+    "sponsors": {
+      "title": "Our academic partners"
+    },
+    "voteModal": {
+      "voteFor": "Vote for",
+      "thankYou": "Thank you for your vote!",
+      "name": "Your full name",
+      "namePlaceholder": "Enter your name",
+      "voteCount": "Number of votes",
+      "agreement": "By voting, you accept the rules of the Miss Master HITBAMAS contest.",
+      "confirm": "Confirm my vote",
+      "success": {
+        "title": "Your vote has been successfully registered!",
+        "desc": "Thank you for your participation in Miss Master HITBAMAS"
+      }
+    },
+    "footer": {
+      "description": "Annual contest promoting academic excellence and leadership of HITBAMAS students.",
+      "navigation": "Navigation",
+      "resources": "Resources",
+      "contact": "Contact",
+      "resources_items": {
+        "rules": "Contest rules",
+        "previous": "Previous editions",
+        "gallery": "Photo gallery"
+      },
+      "copyright": "All rights reserved."
+    }
+  }

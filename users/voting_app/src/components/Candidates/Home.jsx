@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Heart, X, Check, ChevronRight, Instagram, Facebook, Twitter, User, BookOpen, Award, Calendar, Menu, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next'; // Importez useTranslation
 import MonetbilPayment from './MonetbilPayment';
+import LanguageSwitcher from '../LanguageSwitcher';
 
 const Home = () => {
+
+   // Utilisez le hook useTranslation
+   const { t, i18n } = useTranslation();
+
   // État pour le menu mobile
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -165,36 +171,52 @@ const Home = () => {
   // Soumettre le vote et passer au paiement
   const submitVote = (e) => {
     e.preventDefault();
-    
-    // Validation simple
-    if (!voterName.trim() || !voterPhone.trim()) {
-      return;
-    }
+
+
+    // Validation
+  if (!voterName.trim()) {
+    alert("Veuillez entrer votre nom");
+    return;
+  }
+
+    // Assurez-vous que selectedCandidate est bien défini
+  if (!selectedCandidate) {
+    alert("Aucun candidat sélectionné");
+    return;
+  }
     
     // Passer à l'étape de paiement
-    setShowVoteModal(false);
+  // Fermer le modal de vote et ouvrir le modal de paiement
+  // en une seule opération de mise à jour d'état
+  setShowVoteModal(false);
+  // Petit délai pour permettre la fermeture du premier modal
+  setTimeout(() => {
     setShowPaymentModal(true);
+  }, 300);
+
   };
 
   // Gérer le succès du paiement
-  const handlePaymentSuccess = (transactionData) => {
-    // Mettre à jour les votes localement
-    const updatedCandidates = candidates.map(c => {
-      if (c.id === selectedCandidate.id) {
-        return {...c, votes: c.votes + parseInt(voteAmount)};
-      }
-      return c;
-    });
-    
-    // Afficher un message de succès
-    setVoteSuccess(true);
-    
-    // Fermer le modal après un délai
-    setTimeout(() => {
-      setShowPaymentModal(false);
-    }, 2000);
-  };
-
+const handlePaymentSuccess = (transactionData) => {
+  // Mettre à jour les votes localement
+  const updatedCandidates = candidates.map(c => {
+    if (c.id === selectedCandidate.id) {
+      return {...c, votes: c.votes + parseInt(voteAmount)};
+    }
+    return c;
+  });
+  
+  // Afficher un message de succès
+  setVoteSuccess(true);
+  setShowVoteModal(true);
+  setShowPaymentModal(false);
+  
+  // Réinitialiser après un délai
+  setTimeout(() => {
+    setShowVoteModal(false);
+    setSelectedCandidate(null);
+  }, 3000);
+};
   // Toggle pour le menu mobile
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -219,6 +241,10 @@ const Home = () => {
               <a href="tel:+237000000000" className="hover:text-[#D6B981]">+237 000 000 000</a>
               <a href="mailto:contact@hitbamas.org" className="hover:text-[#D6B981]">contact@hitbamas.org</a>
             </div>
+
+            {/* Ajout du sélecteur de langue */}
+            <LanguageSwitcher />
+
             <div className="hidden md:flex space-x-4">
               <a href="#" className="hover:text-[#D6B981] flex items-center">
                 <Facebook size={16} className="mr-1" /> Facebook
@@ -241,30 +267,34 @@ const Home = () => {
             </a>
             
             <nav className="hidden md:flex space-x-6">
-              <a href="#" className="hover:text-[#D6B981] font-medium">Accueil</a>
-              <a href="#candidates" className="hover:text-[#D6B981] font-medium">Candidates</a>
-              <a href="#masters" className="hover:text-[#D6B981] font-medium">Masters</a>
-              <a href="#how-to-vote" className="hover:text-[#D6B981] font-medium">Comment voter</a>
-              <a href="#" className="hover:text-[#D6B981] font-medium">Contact</a>
+              <a href="#" className="hover:text-[#D6B981] font-medium">{t('header.menu.home')}</a>
+              <a href="#candidates" className="hover:text-[#D6B981] font-medium">{t('header.menu.candidates')}</a>
+              <a href="#masters" className="hover:text-[#D6B981] font-medium">{t('header.menu.masters')}</a>
+              <a href="#how-to-vote" className="hover:text-[#D6B981] font-medium">{t('header.menu.howToVote')}</a>
+              <a href="#" className="hover:text-[#D6B981] font-medium">{t('header.menu.contact')}</a>
             </nav>
             
             <button 
               className="md:hidden text-white hover:text-[#D6B981]"
               onClick={toggleMobileMenu}
             >
+
+               {/* Sélecteur de langue pour mobile */}
+               <LanguageSwitcher />
+
               <Menu size={24} />
             </button>
           </div>
           
           {/* Menu mobile */}
-          {mobileMenuOpen && (
+           {mobileMenuOpen && (
             <div className="md:hidden bg-[#96172E] py-2 px-4 animate-fadeIn">
               <nav className="flex flex-col space-y-3 pb-4">
-                <a href="#" className="hover:text-[#D6B981] font-medium py-2 border-b border-white/10" onClick={toggleMobileMenu}>Accueil</a>
-                <a href="#candidates" className="hover:text-[#D6B981] font-medium py-2 border-b border-white/10" onClick={toggleMobileMenu}>Candidates</a>
-                <a href="#masters" className="hover:text-[#D6B981] font-medium py-2 border-b border-white/10" onClick={toggleMobileMenu}>Masters</a>
-                <a href="#how-to-vote" className="hover:text-[#D6B981] font-medium py-2 border-b border-white/10" onClick={toggleMobileMenu}>Comment voter</a>
-                <a href="#" className="hover:text-[#D6B981] font-medium py-2" onClick={toggleMobileMenu}>Contact</a>
+                <a href="#" className="hover:text-[#D6B981] font-medium py-2 border-b border-white/10" onClick={toggleMobileMenu}>{t('header.menu.home')}</a>
+                <a href="#candidates" className="hover:text-[#D6B981] font-medium py-2 border-b border-white/10" onClick={toggleMobileMenu}>{t('header.menu.candidates')}</a>
+                <a href="#masters" className="hover:text-[#D6B981] font-medium py-2 border-b border-white/10" onClick={toggleMobileMenu}>{t('header.menu.masters')}</a>
+                <a href="#how-to-vote" className="hover:text-[#D6B981] font-medium py-2 border-b border-white/10" onClick={toggleMobileMenu}>{t('header.menu.howToVote')}</a>
+                <a href="#" className="hover:text-[#D6B981] font-medium py-2" onClick={toggleMobileMenu}>{t('header.menu.contact')}</a>
                 <div className="flex space-x-4 pt-2">
                   <a href="#" className="hover:text-[#D6B981] flex items-center">
                     <Facebook size={16} />
@@ -290,15 +320,16 @@ const Home = () => {
             alt="Miss Master HITBAMAS Banner" 
             className="w-full h-full object-cover opacity-70"
           />
-        </div>
+          
+          </div>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-4">
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4">MISS & MISTER 2025</h1>
-          <p className="text-lg md:text-xl lg:text-2xl mb-6 md:mb-8 max-w-2xl">Élisez les ambassadeurs de l'excellence académique et des valeurs de HITBAMAS</p>
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4">{t('hero.title')}</h1>
+          <p className="text-lg md:text-xl lg:text-2xl mb-6 md:mb-8 max-w-2xl">{t('hero.subtitle')}</p>
           <a 
             href="#candidates" 
             className="inline-flex items-center bg-[#96172E] hover:bg-[#7d1427] text-white font-medium py-2 md:py-3 px-4 md:px-6 rounded-full transition-colors"
           >
-            Voter maintenant
+            {t('hero.cta')}
             <ChevronRight size={20} className="ml-2" />
           </a>
         </div>
@@ -307,31 +338,31 @@ const Home = () => {
       {/* Comment voter */}
       <section id="how-to-vote" className="py-12 md:py-16 px-4 bg-white">
         <div className="container mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 md:mb-12 text-gray-800">Comment voter ?</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 md:mb-12 text-gray-800">{t('howToVote.title')}</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <div className="text-center p-6 rounded-lg shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
               <div className="w-16 h-16 bg-[#D6B981]/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <User size={24} className="text-[#96172E]" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Choisissez votre candidat(e)</h3>
-              <p className="text-gray-600">Parcourez les profils des étudiants candidats et sélectionnez votre favori(te).</p>
+              <h3 className="text-xl font-semibold mb-3">{t('howToVote.step1.title')}</h3>
+              <p className="text-gray-600">{t('howToVote.step1.desc')}</p>
             </div>
             
             <div className="text-center p-6 rounded-lg shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
               <div className="w-16 h-16 bg-[#D6B981]/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Phone size={24} className="text-[#96172E]" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Paiement mobile</h3>
-              <p className="text-gray-600">Utilisez MTN Mobile Money ou Orange Money pour valider votre vote simplement.</p>
+              <h3 className="text-xl font-semibold mb-3">{t('howToVote.step2.title')}</h3>
+              <p className="text-gray-600">{t('howToVote.step2.desc')}</p>
             </div>
             
             <div className="text-center p-6 rounded-lg shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
               <div className="w-16 h-16 bg-[#D6B981]/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Award size={24} className="text-[#96172E]" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Confirmez votre vote</h3>
-              <p className="text-gray-600">Validez votre choix et soutenez votre candidat(e) pour la couronne Miss/Master.</p>
+              <h3 className="text-xl font-semibold mb-3">{t('howToVote.step3.title')}</h3>
+              <p className="text-gray-600">{t('howToVote.step3.desc')}</p>
             </div>
           </div>
         </div>
@@ -339,10 +370,10 @@ const Home = () => {
       
       {/* Candidates Section - MISS */}
       <section id="candidates" className="py-12 md:py-16 px-4 bg-gray-50">
-        <div className="container mx-auto">
+      <div className="container mx-auto">
           <div className="text-center mb-8 md:mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Nos Candidates MISS 2025</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">Découvrez les étudiantes candidates représentant les différents départements de HITBAMAS.</p>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">{t('candidates.miss.title')}</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">{t('candidates.miss.subtitle')}</p>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
@@ -612,12 +643,12 @@ const Home = () => {
                       </div>
                       
                       <button
-                        type="submit"
-                        className="w-full py-3 bg-[#1a3a6e] hover:bg-blue-800 text-white font-medium rounded transition-colors flex items-center justify-center space-x-2"
-                      >
-                        <Heart size={18} />
-                        <span>Confirmer mon vote</span>
-                      </button>
+                          type="submit"
+                                     className="w-full py-3 bg-[#1a3a6e] hover:bg-blue-800 text-white font-medium rounded transition-colors flex items-center justify-center space-x-2"
+                                                     >
+                                                     <Heart size={18} />
+                                                            <span>Confirmer mon vote</span>
+                                                                                        </button>
                     </div>
                   </form>
                 </>
@@ -626,7 +657,20 @@ const Home = () => {
           </div>
         </div>
       )}
-      
+      {/* Payment Modal */}
+{showPaymentModal && (
+  <MonetbilPayment
+    selectedCandidate={selectedCandidate}
+    voteAmount={voteAmount}
+    voterName={voterName}
+    onPaymentSuccess={handlePaymentSuccess}
+    onPaymentFailure={() => {
+      setShowPaymentModal(false);
+      setShowVoteModal(true);
+    }}
+    onClose={() => setShowPaymentModal(false)}
+  />
+)}
       {/* Footer */}
       <footer className="bg-[#96172E] text-white py-12 px-4">
         <div className="container mx-auto">
