@@ -1,681 +1,567 @@
 import { useState, useEffect } from 'react';
-import { BarChart, ChevronDown, Download, Eye, Pencil, RefreshCw, Search, Trash2, User, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const AdminDashboard = () => {
-  // État pour les données des candidats et les votes
+  const [activeTab, setActiveTab] = useState('candidates');
+  const [categories, setCategories] = useState([]);
   const [candidates, setCandidates] = useState([]);
-  const [votes, setVotes] = useState([]);
-  const [stats, setStats] = useState({
-    totalVotes: 0,
-    totalAmount: 0,
-    todayVotes: 0,
-    todayAmount: 0
-  });
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('dashboard');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
-  const [authError, setAuthError] = useState(false);
+  const [error, setError] = useState(null);
+  const [newCandidate, setNewCandidate] = useState({
+    name: '',
+    department: '',
+    number: '',
+    photoUrl: '',
+    description: '',
+    type: 'miss',
+    categoryId: ''
+  });
+  const [newCategory, setNewCategory] = useState({
+    name: '',
+    description: ''
+  });
+
+  // URL du backend - Ajustez selon votre configuration
+  const API_URL = 'http://localhost:3001';
   
-  // État pour l'authentification
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est déjà authentifié
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-      // Vérifier la validité du token auprès du serveur
-      verifyToken(token);
-    }
-  }, []);
+    checkAuth();
+    fetchInitialData();
+  }, [activeTab]);
 
-  const verifyToken = async (token) => {
-    try {
-      const response = await fetch('/api/admin/verify-token', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        setIsAuthenticated(true);
-        fetchData();
-      } else {
-        localStorage.removeItem('adminToken');
-        setIsAuthenticated(false);
-      }
-    } catch (error) {
-      console.error("Erreur de vérification du token:", error);
-      setIsAuthenticated(false);
+  const checkAuth = () => {
+    // Puisque vous n'utilisez pas de token, vous pouvez soit:
+    // 1. Supprimer cette vérification
+    // 2. Utiliser un autre moyen de vérifier si l'utilisateur est connecté
+    // Par exemple, utiliser une variable dans localStorage
+    const isLoggedIn = localStorage.getItem('isAdminLoggedIn');
+    if (!isLoggedIn) {
+      navigate('/adminlogin');
     }
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setAuthError(false);
-    
+  const fetchInitialData = async () => {
     try {
-      const response = await fetch('/api/admin/login', {
+      setLoading(true);
+      setError(null);
+
+      const [categoriesRes, candidatesRes, statsRes] = await Promise.all([
+        fetch(`${API_URL}/api/admin/categories`),
+        fetch(`${API_URL}/api/admin/candidates`),
+        fetch(`${API_URL}/api/admin/stats`)
+      ]);
+
+      if (!categoriesRes.ok || !candidatesRes.ok || !statsRes.ok) {
+        throw new Error('Failed to fetch data');
+      }
+
+      const categoriesData = await categoriesRes.json();
+      const candidatesData = await candidatesRes.json();
+      const statsData = await statsRes.json();
+
+      setCategories(categoriesData.data);
+      setCandidates(candidatesData.data);
+      setStats(statsData.data);
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error.message);
+      toast.error(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateCandidate = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_URL}/api/admin/candidates`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify(newCandidate)
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('adminToken', data.token);
-        setIsAuthenticated(true);
-        fetchData();
-      } else {
-        setAuthError(true);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create candidate');
       }
+
+      toast.success('Candidate created successfully!');
+      setNewCandidate({
+        name: '',
+        department: '',
+        number: '',
+        photoUrl: '',
+        description: '',
+        type: 'miss',
+        categoryId: ''
+      });
+      fetchInitialData();
     } catch (error) {
-      console.error("Erreur de connexion:", error);
-      setAuthError(true);
+      console.error('Error:', error);
+      toast.error(`Error: ${error.message}`);
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_URL}/api/admin/categories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newCategory)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create category');
+      }
+
+      toast.success('Category created successfully!');
+      setNewCategory({ name: '', description: '' });
+      fetchInitialData();
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(`Error: ${error.message}`);
+    }
+  };
+
+  const toggleCandidateStatus = async (id, currentStatus) => {
+    try {
+      // Remarque: selon votre route backend, cette fonction pourrait ne pas fonctionner
+      // car vous avez une route DELETE mais pas PATCH dans votre API
+      const response = await fetch(`${API_URL}/api/admin/candidates/${id}`, {
+        method: 'DELETE', // Utilisez DELETE car c'est ce que votre API supporte
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update candidate');
+      }
+
+      toast.success(`Candidate deactivated successfully!`);
+      fetchInitialData();
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(`Error: ${error.message}`);
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    setIsAuthenticated(false);
+    localStorage.removeItem('isAdminLoggedIn');
+    navigate('/adminlogin');
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    
-    try {
-      // Récupérer les statistiques générales
-      const statsResponse = await fetch('/api/admin/stats', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      });
-      const statsData = await statsResponse.json();
-      setStats(statsData);
-      
-      // Récupérer les candidats
-      const candidatesResponse = await fetch('/api/admin/candidates', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      });
-      const candidatesData = await candidatesResponse.json();
-      setCandidates(candidatesData);
-      
-      // Récupérer les votes
-      const votesResponse = await fetch('/api/admin/votes', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      });
-      const votesData = await votesResponse.json();
-      setVotes(votesData);
-      
-      setLoading(false);
-    } catch (error) {
-      console.error("Erreur lors de la récupération des données:", error);
-      setLoading(false);
-    }
-  };
-
-  const deleteVote = async (voteId) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce vote ?")) {
-      return;
-    }
-    
-    try {
-      const response = await fetch(`/api/admin/votes/${voteId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      });
-      
-      if (response.ok) {
-        // Rafraîchir les données après suppression
-        fetchData();
-      } else {
-        alert("Erreur lors de la suppression du vote");
-      }
-    } catch (error) {
-      console.error("Erreur de suppression:", error);
-      alert("Erreur lors de la suppression du vote");
-    }
-  };
-
-  const editVote = async (voteId, newAmount) => {
-    try {
-      const response = await fetch(`/api/admin/votes/${voteId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        },
-        body: JSON.stringify({ voteAmount: newAmount })
-      });
-      
-      if (response.ok) {
-        // Rafraîchir les données après modification
-        fetchData();
-      } else {
-        alert("Erreur lors de la modification du vote");
-      }
-    } catch (error) {
-      console.error("Erreur de modification:", error);
-      alert("Erreur lors de la modification du vote");
-    }
-  };
-
-  const exportToCSV = () => {
-    // Créer les données CSV
-    let csvContent = "ID,Date,Nom Candidat,Numéro Candidat,Votant,Téléphone,Nombre de votes,Montant\n";
-    
-    votes.forEach(vote => {
-      const candidate = candidates.find(c => c.id === vote.candidateId) || {};
-      csvContent += `${vote.id},${vote.date},${candidate.name || ''},${candidate.number || ''},${vote.voterName},${vote.voterPhone || ''},${vote.voteAmount},${vote.amount} FCFA\n`;
-    });
-    
-    // Créer un lien de téléchargement
-    const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `votes_export_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Filtrer les votes selon le terme de recherche
-  const filteredVotes = votes.filter(vote => {
-    const candidate = candidates.find(c => c.id === vote.candidateId) || {};
-    const searchStr = (vote.voterName + ' ' + (candidate.name || '') + ' ' + (vote.voterPhone || '')).toLowerCase();
-    return searchStr.includes(searchTerm.toLowerCase());
-  });
-
-  // Trier les votes
-  const sortedVotes = [...filteredVotes].sort((a, b) => {
-    if (sortConfig.key === 'date') {
-      return sortConfig.direction === 'asc' 
-        ? new Date(a.date) - new Date(b.date)
-        : new Date(b.date) - new Date(a.date);
-    } else if (sortConfig.key === 'amount') {
-      return sortConfig.direction === 'asc' 
-        ? a.amount - b.amount
-        : b.amount - a.amount;
-    } else if (sortConfig.key === 'voteAmount') {
-      return sortConfig.direction === 'asc' 
-        ? a.voteAmount - b.voteAmount
-        : b.voteAmount - a.voteAmount;
-    }
-    return 0;
-  });
-
-  // Fonction pour changer le tri
-  const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  // Interface de connexion admin
-  if (!isAuthenticated) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-8">
-          <div className="flex justify-center mb-6">
-            <img src="/hitlogo.jpeg" alt="HITBAMAS" className="h-16" />
-          </div>
-          <h1 className="text-2xl font-bold text-center text-gray-800 mb-6">Administration Miss Master HITBAMAS</h1>
-          
-          {authError && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-              Identifiants incorrects. Veuillez réessayer.
-            </div>
-          )}
-          
-          <form onSubmit={handleLogin}>
-            <div className="mb-4">
-              <label htmlFor="username" className="block text-gray-700 text-sm font-bold mb-2">
-                Nom d'utilisateur
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            
-            <div className="mb-6">
-              <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">
-                Mot de passe
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            
-            <button
-              type="submit"
-              className="w-full bg-[#96172E] hover:bg-[#7d1427] text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              Connexion
-            </button>
-          </form>
-          
-          <div className="mt-6 text-center">
-            <Link to="/" className="text-sm text-blue-600 hover:underline">
-              Retourner à l'accueil
-            </Link>
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard data...</p>
         </div>
       </div>
     );
   }
 
-  // Interface principale admin après authentification
   return (
     <div className="min-h-screen bg-gray-50">
+      <ToastContainer position="top-right" autoClose={5000} />
+      
       {/* Header */}
-      <header className="bg-[#96172E] text-white shadow-md">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <img src="/hitlogo.jpeg" alt="HITBAMAS" className="h-10" />
-            <h1 className="text-xl font-bold">Administration Miss Master HITBAMAS</h1>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <span className="hidden md:inline-block">Admin</span>
-            <button 
-              onClick={handleLogout}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-md transition-colors"
-            >
-              Déconnexion
-            </button>
-          </div>
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">HITBAMAS Admin Dashboard</h1>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+          >
+            Logout
+          </button>
         </div>
       </header>
-      
-      <div className="container mx-auto px-4 py-6">
-        {/* Navigation */}
-        <div className="flex flex-wrap mb-6 gap-2">
-          <button 
-            className={`px-4 py-2 rounded-md transition-colors ${selectedTab === 'dashboard' ? 'bg-[#96172E] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}
-            onClick={() => setSelectedTab('dashboard')}
-          >
-            <span className="flex items-center">
-              <BarChart size={18} className="mr-2" />
-              Tableau de bord
-            </span>
-          </button>
-          
-          <button 
-            className={`px-4 py-2 rounded-md transition-colors ${selectedTab === 'votes' ? 'bg-[#96172E] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}
-            onClick={() => setSelectedTab('votes')}
-          >
-            <span className="flex items-center">
-              <Users size={18} className="mr-2" />
-              Votes
-            </span>
-          </button>
-          
-          <button 
-            className={`px-4 py-2 rounded-md transition-colors ${selectedTab === 'candidates' ? 'bg-[#96172E] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}
-            onClick={() => setSelectedTab('candidates')}
-          >
-            <span className="flex items-center">
-              <User size={18} className="mr-2" />
-              Candidats
-            </span>
-          </button>
-          
-          <div className="ml-auto">
-            <button 
-              onClick={fetchData}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors flex items-center"
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        {/* Stats Overview */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-medium text-gray-900">Total Votes</h3>
+              <p className="mt-2 text-3xl font-bold text-indigo-600">{stats.totalVotes}</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-medium text-gray-900">Total Amount</h3>
+              <p className="mt-2 text-3xl font-bold text-indigo-600">{stats.totalAmount} FCFA</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-medium text-gray-900">Active Candidates</h3>
+              <p className="mt-2 text-3xl font-bold text-indigo-600">{candidates.filter(c => c.active).length}</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-medium text-gray-900">Categories</h3>
+              <p className="mt-2 text-3xl font-bold text-indigo-600">{categories.length}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('candidates')}
+              className={`${activeTab === 'candidates' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Actualiser
+              Candidates
             </button>
-          </div>
+            <button
+              onClick={() => setActiveTab('categories')}
+              className={`${activeTab === 'categories' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Categories
+            </button>
+            <button
+              onClick={() => setActiveTab('votes')}
+              className={`${activeTab === 'votes' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Votes
+            </button>
+          </nav>
         </div>
-        
-        {/* Contenu principal */}
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#96172E]"></div>
-          </div>
-        ) : (
-          <>
-            {/* Tableau de bord */}
-            {selectedTab === 'dashboard' && (
-              <div>
-                {/* Statistiques */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  {/* Total des votes */}
-                  <div className="bg-white p-6 rounded-lg shadow-md">
-                    <div className="text-gray-500 text-sm mb-1">Total des votes</div>
-                    <div className="text-3xl font-bold text-gray-800">{stats.totalVotes}</div>
-                    <div className="mt-2 text-sm text-gray-600">Depuis le début du concours</div>
+
+        {/* Tab Content */}
+        {activeTab === 'candidates' && (
+          <div className="space-y-6">
+            {/* Add Candidate Form */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Add New Candidate</h2>
+              <form onSubmit={handleCreateCandidate} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Name *</label>
+                    <input
+                      type="text"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      value={newCandidate.name}
+                      onChange={(e) => setNewCandidate({...newCandidate, name: e.target.value})}
+                      required
+                    />
                   </div>
-                  
-                  {/* Montant total collecté */}
-                  <div className="bg-white p-6 rounded-lg shadow-md">
-                    <div className="text-gray-500 text-sm mb-1">Montant total collecté</div>
-                    <div className="text-3xl font-bold text-gray-800">{stats.totalAmount.toLocaleString()} FCFA</div>
-                    <div className="mt-2 text-sm text-gray-600">Tous votes confondus</div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Department</label>
+                    <input
+                      type="text"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      value={newCandidate.department}
+                      onChange={(e) => setNewCandidate({...newCandidate, department: e.target.value})}
+                    />
                   </div>
-                  
-                  {/* Votes aujourd'hui */}
-                  <div className="bg-white p-6 rounded-lg shadow-md">
-                    <div className="text-gray-500 text-sm mb-1">Votes aujourd'hui</div>
-                    <div className="text-3xl font-bold text-gray-800">{stats.todayVotes}</div>
-                    <div className={`mt-2 text-sm ${stats.todayVotes > 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                      {stats.todayVotes > 0 ? '+' + stats.todayVotes + ' aujourd\'hui' : 'Aucun vote aujourd\'hui'}
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Number</label>
+                    <input
+                      type="text"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      value={newCandidate.number}
+                      onChange={(e) => setNewCandidate({...newCandidate, number: e.target.value})}
+                    />
                   </div>
-                  
-                  {/* Montant aujourd'hui */}
-                  <div className="bg-white p-6 rounded-lg shadow-md">
-                    <div className="text-gray-500 text-sm mb-1">Montant aujourd'hui</div>
-                    <div className="text-3xl font-bold text-gray-800">{stats.todayAmount.toLocaleString()} FCFA</div>
-                    <div className={`mt-2 text-sm ${stats.todayAmount > 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                      {stats.todayAmount > 0 ? '+' + stats.todayAmount.toLocaleString() + ' FCFA' : 'Aucun montant aujourd\'hui'}
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Photo URL</label>
+                    <input
+                      type="text"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      value={newCandidate.photoUrl}
+                      onChange={(e) => setNewCandidate({...newCandidate, photoUrl: e.target.value})}
+                    />
                   </div>
-                </div>
-                
-                {/* Graphique des votes par candidat */}
-                <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-                  <h2 className="text-xl font-bold text-gray-800 mb-4">Votes par candidat</h2>
-                  <div className="h-64">
-                    {/* Ici vous pourriez intégrer un graphique avec une bibliothèque comme recharts */}
-                    <div className="space-y-4">
-                      {candidates.sort((a, b) => b.votes - a.votes).map(candidate => (
-                        <div key={candidate.id} className="flex flex-col">
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-medium text-gray-700">
-                              {candidate.name} ({candidate.type === 'miss' ? 'Miss' : 'Master'}) - {candidate.votes} votes
-                            </span>
-                            <span className="text-sm font-medium text-gray-700">
-                              {Math.round((candidate.votes / stats.totalVotes) * 100)}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div 
-                              className={`h-2.5 rounded-full ${candidate.type === 'miss' ? 'bg-pink-500' : 'bg-blue-500'}`} 
-                              style={{ width: `${(candidate.votes / stats.totalVotes) * 100}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea
+                      rows={3}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      value={newCandidate.description}
+                      onChange={(e) => setNewCandidate({...newCandidate, description: e.target.value})}
+                    />
                   </div>
-                </div>
-                
-                {/* Activité récente */}
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-gray-800">Votes récents</h2>
-                    <Link to="#" className="text-sm text-blue-600 hover:underline" onClick={() => setSelectedTab('votes')}>
-                      Voir tous les votes
-                    </Link>
-                  </div>
-                  
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white">
-                      <thead>
-                        <tr className="bg-gray-100 text-gray-600 text-left text-sm">
-                          <th className="py-3 px-4 font-medium">Date</th>
-                          <th className="py-3 px-4 font-medium">Votant</th>
-                          <th className="py-3 px-4 font-medium">Candidat</th>
-                          <th className="py-3 px-4 font-medium">Votes</th>
-                          <th className="py-3 px-4 font-medium">Montant</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-gray-600 text-sm">
-                        {votes.slice(0, 5).map(vote => {
-                          const candidate = candidates.find(c => c.id === vote.candidateId) || {};
-                          return (
-                            <tr key={vote.id} className="border-b border-gray-200 hover:bg-gray-50">
-                              <td className="py-3 px-4">{new Date(vote.date).toLocaleString()}</td>
-                              <td className="py-3 px-4">{vote.voterName}</td>
-                              <td className="py-3 px-4 flex items-center">
-                                <span className={`inline-block w-2 h-2 rounded-full mr-2 ${candidate.type === 'miss' ? 'bg-pink-500' : 'bg-blue-500'}`}></span>
-                                {candidate.name} (N°{candidate.number})
-                              </td>
-                              <td className="py-3 px-4">{vote.voteAmount}</td>
-                              <td className="py-3 px-4">{vote.amount} FCFA</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Liste des votes */}
-            {selectedTab === 'votes' && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex flex-wrap justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-800">Liste des votes</h2>
-                  
-                  <div className="flex flex-wrap mt-4 sm:mt-0 gap-2">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Rechercher..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                    </div>
-                    
-                    <button
-                      onClick={exportToCSV}
-                      className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors flex items-center"
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Type *</label>
+                    <select
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      value={newCandidate.type}
+                      onChange={(e) => setNewCandidate({...newCandidate, type: e.target.value})}
+                      required
                     >
-                      <Download size={18} className="mr-2" />
-                      Exporter CSV
-                    </button>
+                      <option value="miss">Miss</option>
+                      <option value="master">Master</option>
+                      <option value="dance">Dance</option>
+                      <option value="chant">Chant</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Category *</label>
+                    <select
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      value={newCandidate.categoryId}
+                      onChange={(e) => setNewCandidate({...newCandidate, categoryId: e.target.value})}
+                      required
+                    >
+                      <option value="">Select a category</option>
+                      {categories.map(category => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="min-w-full bg-white">
-                    <thead>
-                      <tr className="bg-gray-100 text-gray-600 text-left text-sm">
-                        <th className="py-3 px-4 font-medium">ID</th>
-                        <th 
-                          className="py-3 px-4 font-medium cursor-pointer hover:bg-gray-200"
-                          onClick={() => requestSort('date')}
-                        >
-                          Date
-                          {sortConfig.key === 'date' && (
-                            <ChevronDown 
-                              size={16} 
-                              className={`inline ml-1 ${sortConfig.direction === 'desc' ? 'transform rotate-180' : ''}`} 
-                            />
-                          )}
-                        </th>
-                        <th className="py-3 px-4 font-medium">Votant</th>
-                        <th className="py-3 px-4 font-medium">Téléphone</th>
-                        <th className="py-3 px-4 font-medium">Candidat</th>
-                        <th 
-                          className="py-3 px-4 font-medium cursor-pointer hover:bg-gray-200"
-                          onClick={() => requestSort('voteAmount')}
-                        >
-                          Votes
-                          {sortConfig.key === 'voteAmount' && (
-                            <ChevronDown 
-                              size={16} 
-                              className={`inline ml-1 ${sortConfig.direction === 'desc' ? 'transform rotate-180' : ''}`} 
-                            />
-                          )}
-                        </th>
-                        <th 
-                          className="py-3 px-4 font-medium cursor-pointer hover:bg-gray-200"
-                          onClick={() => requestSort('amount')}
-                        >
-                          Montant
-                          {sortConfig.key === 'amount' && (
-                            <ChevronDown 
-                              size={16} 
-                              className={`inline ml-1 ${sortConfig.direction === 'desc' ? 'transform rotate-180' : ''}`} 
-                            />
-                          )}
-                        </th>
-                        <th className="py-3 px-4 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-600 text-sm">
-                      {sortedVotes.map(vote => {
-                        const candidate = candidates.find(c => c.id === vote.candidateId) || {};
-                        return (
-                          <tr key={vote.id} className="border-b border-gray-200 hover:bg-gray-50">
-                            <td className="py-3 px-4">{vote.id}</td>
-                            <td className="py-3 px-4">{new Date(vote.date).toLocaleString()}</td>
-                            <td className="py-3 px-4">{vote.voterName}</td>
-                            <td className="py-3 px-4">{vote.voterPhone || '-'}</td>
-                            <td className="py-3 px-4 flex items-center">
-                              <span className={`inline-block w-2 h-2 rounded-full mr-2 ${candidate.type === 'miss' ? 'bg-pink-500' : 'bg-blue-500'}`}></span>
-                              {candidate.name} (N°{candidate.number})
-                            </td>
-                            <td className="py-3 px-4">{vote.voteAmount}</td>
-                            <td className="py-3 px-4">{vote.amount} FCFA</td>
-                            <td className="py-3 px-4">
-                              <div className="flex space-x-2">
-                                <button 
-                                  onClick={() => {
-                                    const newAmount = prompt("Nouveau nombre de votes:", vote.voteAmount);
-                                    if (newAmount && !isNaN(newAmount) && parseInt(newAmount) > 0) {
-                                      editVote(vote.id, parseInt(newAmount));
-                                    }
-                                  }}
-                                  className="text-blue-500 hover:text-blue-700"
-                                >
-                                  <Pencil size={16} />
-                                </button>
-                                <button 
-                                  onClick={() => deleteVote(vote.id)}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      
-                      {sortedVotes.length === 0 && (
-                        <tr>
-                          <td colSpan="8" className="py-8 text-center text-gray-500">
-                            Aucun vote trouvé
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Add Candidate
+                  </button>
                 </div>
+              </form>
+            </div>
+
+            {/* Candidates List */}
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-medium text-gray-900">Candidates</h2>
               </div>
-            )}
-            
-            {/* Liste des candidats */}
-            {selectedTab === 'candidates' && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">Liste des candidats</h2>
-                
-                <div className="overflow-x-auto">
-                  <table className="min-w-full bg-white">
-                    <thead>
-                      <tr className="bg-gray-100 text-gray-600 text-left text-sm">
-                        <th className="py-3 px-4 font-medium">ID</th>
-                        <th className="py-3 px-4 font-medium">Photo</th>
-                        <th className="py-3 px-4 font-medium">Nom</th>
-                        <th className="py-3 px-4 font-medium">Département</th>
-                        <th className="py-3 px-4 font-medium">Numéro</th>
-                        <th className="py-3 px-4 font-medium">Type</th>
-                        <th className="py-3 px-4 font-medium">Votes</th>
-                        <th className="py-3 px-4 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-600 text-sm">
-                      {candidates.map(candidate => (
-                        <tr key={candidate.id} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="py-3 px-4">{candidate.id}</td>
-                          <td className="py-3 px-4">
-                            <img 
-                              src={candidate.photoUrl} 
-                              alt={candidate.name} 
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
-                          </td>
-                          <td className="py-3 px-4">{candidate.name}</td>
-                          <td className="py-3 px-4">{candidate.department}</td>
-                          <td className="py-3 px-4">{candidate.number}</td>
-                          <td className="py-3 px-4">
-                            <span 
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                candidate.type === 'miss' 
-                                  ? 'bg-pink-100 text-pink-800' 
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}
-                            >
-                              {candidate.type === 'miss' ? 'Miss' : 'Master'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">{candidate.votes}</td>
-                          <td className="py-3 px-4">
-                            <div className="flex space-x-2">
-                              <button 
-                                onClick={() => alert('Fonction de modification à implémenter.')}
-                                className="text-blue-500 hover:text-blue-700"
-                              >
-                                <Pencil size={16} />
-                              </button>
-                              <button 
-                                onClick={() => alert('Fonction de suppression à implémenter.')}
-                                className="text-red-500 hover:text-red-700"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Votes</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {candidates.length > 0 ? (
+                      candidates.map((candidate) => (
+                        <tr key={candidate.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {candidate.photoUrl && (
+                                <div className="flex-shrink-0 h-10 w-10">
+                                  <img className="h-10 w-10 rounded-full" src={candidate.photoUrl} alt={candidate.name} />
+                                </div>
+                              )}
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">{candidate.name}</div>
+                                <div className="text-sm text-gray-500">{candidate.department || 'N/A'}</div>
+                              </div>
                             </div>
                           </td>
-                        </tr>
-                      ))}
-                      {candidates.length === 0 && (
-                        <tr>
-                          <td colSpan="8" className="py-8 text-center text-gray-500">
-                            Aucun candidat enregistré
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {candidate.categoryName || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                            {candidate.type}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {candidate.totalVotes || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${candidate.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              {candidate.active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => toggleCandidateStatus(candidate.id, candidate.active)}
+                              className={`mr-3 ${candidate.active ? 'text-yellow-600 hover:text-yellow-900' : 'text-green-600 hover:text-green-900'}`}
+                            >
+                              {candidate.active ? 'Deactivate' : 'Activate'}
+                            </button>
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
+                          No candidates found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'categories' && (
+          <div className="space-y-6">
+            {/* Add Category Form */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Add New Category</h2>
+              <form onSubmit={handleCreateCategory} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Name *</label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    value={newCategory.name}
+                    onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <textarea
+                    rows={3}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    value={newCategory.description}
+                    onChange={(e) => setNewCategory({...newCategory, description: e.target.value})}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Add Category
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Categories List */}
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-medium text-gray-900">Categories</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidates</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {categories.length > 0 ? (
+                      categories.map((category) => (
+                        <tr key={category.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{category.name}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {category.description || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {candidates.filter(c => c.categoryId === category.id).length}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${category.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              {category.active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                          No categories found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'votes' && stats && (
+          <div className="space-y-6">
+            {/* Votes Stats */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Voting Statistics</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">Votes by Category</h3>
+                  <ul className="space-y-2">
+                    {stats.byCategory && stats.byCategory.length > 0 ? (
+                      stats.byCategory.map(category => (
+                        <li key={category.id} className="flex justify-between">
+                          <span>{category.name}</span>
+                          <span className="font-medium">{category.totalVotes} votes ({category.totalAmount} FCFA)</span>
+                        </li>
+                      ))
+                    ) : (
+                      <li>No votes recorded yet</li>
+                    )}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">Top Candidates</h3>
+                  <ul className="space-y-2">
+                    {stats.topCandidates && stats.topCandidates.length > 0 ? (
+                      stats.topCandidates.map(candidate => (
+                        <li key={candidate.id} className="flex justify-between">
+                          <span>{candidate.name} ({candidate.type})</span>
+                          <span className="font-medium">{candidate.totalVotes} votes</span>
+                        </li>
+                      ))
+                    ) : (
+                      <li>No votes recorded yet</li>
+                    )}
+                  </ul>
                 </div>
               </div>
-            )}
-          </>
+            </div>
+
+            {/* Recent Votes */}
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-medium text-gray-900">Recent Votes</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Voter</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Votes</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {/* Note: Vous devrez ajouter une route pour récupérer les votes récents */}
+                    <tr>
+                      <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                        Recent votes will appear here (API endpoint not implemented yet)
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
-      </div>
+      </main>
     </div>
   );
 };

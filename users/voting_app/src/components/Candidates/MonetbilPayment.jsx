@@ -77,7 +77,7 @@ const MonetbilPayment = ({
         amount: getAmount(),
         operator: selectedOperator,
         country: 'CM',
-        currency: 'XAF',
+        currency: 'XAF', 
         item_ref: `candidate_vote_${selectedCandidate.id}`,
         payment_ref: `vote_${Date.now()}`,
         user: voterName,
@@ -115,39 +115,43 @@ const MonetbilPayment = ({
   };
 
   // Fonction pour vérifier l'état du paiement
-  const checkPaymentStatus = async (paymentId) => {
-    try {
-      const response = await fetch('https://api.monetbil.com/payment/v1/checkPayment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          paymentId: paymentId,
-          service: serviceKey
-        })
-      });
+const checkPaymentStatus = async (paymentId) => {
+  try {
+    const response = await fetch('https://api.monetbil.com/payment/v1/checkPayment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        paymentId: paymentId,
+        service: serviceKey
+      })
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (data.transaction) {
-        if (data.transaction.status === 1) { // Succès
-          setPaymentStatus(data.transaction);
-          setPaymentStep('success');
-          if (onPaymentSuccess) {
-            onPaymentSuccess(data.transaction);
-          }
-          stopCheckingPayment();
-        } else if (data.transaction.status === -1 || data.transaction.status === 0) { // Annulé ou échec
-          setErrorMessage(data.transaction.message || 'Paiement annulé ou échoué');
-          setPaymentStep('failure');
-          stopCheckingPayment();
+    if (data.transaction) {
+      if (data.transaction.status === 1) { // Succès
+        setPaymentStatus(data.transaction);
+        stopCheckingPayment();
+        
+        // Appeler d'abord le callback de succès
+        if (onPaymentSuccess) {
+          onPaymentSuccess(data.transaction);
         }
+        
+        // Ensuite seulement changer l'état local
+        setPaymentStep('success');
+      } else if (data.transaction.status === -1 || data.transaction.status === 0) { // Annulé ou échec
+        setErrorMessage(data.transaction.message || 'Paiement annulé ou échoué');
+        setPaymentStep('failure');
+        stopCheckingPayment();
       }
-    } catch (error) {
-      console.error('Erreur lors de la vérification du statut de paiement:', error);
     }
-  };
+  } catch (error) {
+    console.error('Erreur lors de la vérification du statut de paiement:', error);
+  }
+};
 
   // Démarrer la vérification périodique du statut du paiement
   const startCheckingPayment = (paymentId) => {

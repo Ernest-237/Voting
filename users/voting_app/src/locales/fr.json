@@ -76,5 +76,40 @@
         "gallery": "Galerie photos"
       },
       "copyright": "Tous droits réservés."
+    },
+    
+    "voiceCompetition": {
+      "title": "THE VOICE COMPETITION",
+      "subtitle": "Soutenez vos talents vocaux préférés",
+      "voteNow": "Voter maintenant",
+      "howToVote": "Comment voter ?",
+      "step1": "Choisissez votre candidat",
+      "step1Desc": "Découvrez les talents et sélectionnez votre favori",
+      "step2": "Paiement mobile",
+      "step2Desc": "Payez via Mobile Money pour valider votre vote",
+      "step3": "Confirmez votre vote",
+      "step3Desc": "Validez votre choix pour soutenir l'artiste",
+      "contestants": "Nos candidats",
+      "contestantsDesc": "Découvrez les talents en compétition"
+    },
+    "vote": {
+      "button": "Voter",
+      "thanks": "Merci pour votre vote!",
+      "for": "Voter pour",
+      "success": "Votre vote a été enregistré!",
+      "appreciation": "Merci pour votre soutien à The Voice Competition",
+      "validation": {
+        "nameRequired": "Veuillez entrer votre nom",
+        "noCandidate": "Aucun candidat sélectionné"
+      },
+      "form": {
+        "name": "Votre nom complet",
+        "namePlaceholder": "Entrez votre nom",
+        "voteCount": "Nombre de votes",
+        "vote": "vote",
+        "votes": "votes",
+        "terms": "En votant, vous acceptez les règles du concours The Voice",
+        "confirm": "Confirmer mon vote"
+      }
     }
   }
