@@ -1,6 +1,11 @@
-services:
-  - type: web
-    name: voting-app
-    runtime: node
-    buildCommand: npm install && npm run build
-    staticPublishPath: "./dist"
+
+    # render.yaml
+static_sites:
+  - name: voting-app-frontend
+    build_command: npm run build
+    publish_dir: dist
+    routes:
+      - path: /*
+        static_headers:
+          - key: Content-Type
+            value: text/html

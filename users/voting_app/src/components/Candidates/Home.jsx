@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Heart, X, Check, ChevronRight, Instagram, Facebook, Twitter, User, BookOpen, Award, Calendar, Menu, Phone } from 'lucide-react';
+import { Heart, X, Check, ChevronRight, Instagram, Facebook, Twitter, Menu, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next'; // Importez useTranslation
 import MonetbilPayment from './MonetbilPayment';
-import LanguageSwitcher from '../LanguageSwitcher';
+import { createClient } from '@supabase/supabase-js';
 
-const BASE_URL = 'http://localhost:3001'; // à adapter si besoin
+// Configuration Supabase - à remplacer par vos propres clés
+const SUPABASE_URL = 'https://vdnbkevncovdssvgyrzr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbmJrZXZuY292ZHNzdmd5cnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3NDU1MjMsImV4cCI6MjA2MDMyMTUyM30.BLKZQ6GJkPhEa6i79efv7QBmnfP_VtTN-9ON67w4JfY';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const Home = () => {
   // États pour les candidats et le chargement
@@ -14,45 +16,43 @@ const Home = () => {
   const [error, setError] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-   // État pour le modal de vote et paiement
-   const [showVoteModal, setShowVoteModal] = useState(false);
-   const [selectedCandidate, setSelectedCandidate] = useState(null);
-   const [voterName, setVoterName] = useState("");
-   const [voterPhone, setVoterPhone] = useState("");
-   const [voteSuccess, setVoteSuccess] = useState(false);
-   const [voteAmount, setVoteAmount] = useState(1);
-   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  // État pour le modal de vote et paiement
+  const [showVoteModal, setShowVoteModal] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [voterName, setVoterName] = useState("");
+  const [voterPhone, setVoterPhone] = useState("");
+  const [voteSuccess, setVoteSuccess] = useState(false);
+  const [voteAmount, setVoteAmount] = useState(1);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Charger tous les candidats depuis l'API
+  // Charger tous les candidats depuis Supabase
   useEffect(() => {
     const fetchCandidates = async () => {
       try {
         setLoading(true);
-        // Récupérer toutes les catégories actives
-        const categoriesResponse = await fetch(`${BASE_URL}/api/admin/categories`);
-        if (!categoriesResponse.ok) {
-          throw new Error('Erreur lors du chargement des catégories');
+        
+        // Récupérer tous les candidats depuis Supabase
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('*')
+          .order('number', { ascending: true });
+          
+        if (error) {
+          throw error;
         }
-        const categoriesData = await categoriesResponse.json();
         
-        if (!categoriesData.success || !categoriesData.data) {
-          throw new Error('Aucune catégorie trouvée');
-        }
+        // Transformer les données pour correspondre au format attendu par le composant
+        const transformedData = data.map(candidate => ({
+          id: candidate.id,
+          name: candidate.name,
+          photoUrl: candidate.photo_url,
+          department: candidate.department,
+          type: candidate.type,
+          number: candidate.number,
+          votes: candidate.votes || 0
+        }));
         
-        // Pour chaque catégorie, récupérer les candidats
-        const allCandidatesPromises = categoriesData.data
-          .filter(cat => cat.active)
-          .map(async (category) => {
-            const response = await fetch(`${BASE_URL}/api/candidates/${category.name}`);
-            if (!response.ok) return [];
-            const data = await response.json();
-            return data.success ? data.data : [];
-          });
-        
-        const allCandidatesArrays = await Promise.all(allCandidatesPromises);
-        const allCandidates = allCandidatesArrays.flat();
-        
-        setCandidates(allCandidates);
+        setCandidates(transformedData);
       } catch (err) {
         console.error("Erreur lors du chargement des candidats:", err);
         setError(err.message);
@@ -87,6 +87,11 @@ const Home = () => {
       alert("Veuillez entrer votre nom");
       return;
     }
+    
+    if (!voterPhone.trim()) {
+      alert("Veuillez entrer votre numéro de téléphone");
+      return;
+    }
 
     if (!selectedCandidate) {
       alert("Aucun candidat sélectionné");
@@ -103,47 +108,57 @@ const Home = () => {
   // Gérer le succès du paiement
   const handlePaymentSuccess = async (transactionData) => {
     try {
-      // Enregistrer le vote dans la base de données
-      const response = await fetch(`${BASE_URL}/api/votes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          candidateId: selectedCandidate.id,
-          voterName,
-          voterPhone,
-          voteCount: parseInt(voteAmount),
-          amount: getAmount(voteAmount),
-          transactionId: transactionData?.transaction_UUID || 'test-transaction'
-        })
-      });
+      // Insérer le vote dans Supabase
+      const { data: voteData, error: voteError } = await supabase
+        .from('votes')
+        .insert([
+          {
+            candidate_id: selectedCandidate.id,
+            voter_name: voterName,
+            voter_phone: voterPhone,
+            vote_count: parseInt(voteAmount),
+            amount: getAmount(voteAmount),
+            transaction_id: transactionData?.transaction_UUID || 'test-transaction',
+            payment_status: 'completed'
+          }
+        ])
+        .select();
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'enregistrement du vote');
+      if (voteError) {
+        throw voteError;
       }
 
-      // Mettre à jour localement seulement après confirmation du serveur
+      // Mettre à jour le nombre de votes du candidat dans Supabase
+      const { data: updateData, error: updateError } = await supabase
+        .from('candidates')
+        .update({ votes: selectedCandidate.votes + parseInt(voteAmount) })
+        .eq('id', selectedCandidate.id)
+        .select();
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Mettre à jour localement seulement après confirmation de Supabase
       const updatedCandidates = candidates.map(c => {
         if (c.id === selectedCandidate.id) {
-          return {...c, votes: (c.votes || 0) + parseInt(voteAmount)};
+          return {...c, votes: c.votes + parseInt(voteAmount)};
         }
         return c;
       });
       
       setCandidates(updatedCandidates);
-
-      // Fermer d'abord le modal de paiement
-      setVoteSuccess(false);
-
-        // Ensuite afficher le message de succès
+      setShowPaymentModal(false);
+      
+      // Afficher le message de succès
+      setVoteSuccess(true);
       setShowVoteModal(true);
-      setShowPaymentModal(true);
       
       // Fermer automatiquement après quelques secondes
       setTimeout(() => {
         setShowVoteModal(false);
         setSelectedCandidate(null);
+        setVoteSuccess(false);
       }, 3000);
     } catch (error) {
       console.error("Erreur:", error);
@@ -177,7 +192,7 @@ const Home = () => {
           {/* Top Bar */}
           <div className="flex justify-between items-center py-2 px-4 text-sm border-b border-opacity-20 border-white">
             <div className="flex space-x-4">
-              <a href="tel:+237 695965175" className="hover:text-[#D6B981]">+237 +237 695965175</a>
+              <a href="tel:+237 695965175" className="hover:text-[#D6B981]">+237 695965175</a>
               <a href="mailto:contact@hitbamas.org" className="hover:text-[#D6B981]">contact@hitbamas.org</a>
             </div>
 
@@ -268,8 +283,22 @@ const Home = () => {
         </div>
       </section>
       
+      {/* État de chargement */}
+      {loading && (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#96172E]"></div>
+        </div>
+      )}
+
+      {/* Message d'erreur */}
+      {error && (
+        <div className="bg-red-50 text-red-800 p-4 rounded-md mx-auto max-w-2xl my-8">
+          <p>Une erreur est survenue lors du chargement des candidats: {error}</p>
+        </div>
+      )}
+      
       {/* Section Candidates - MISS */}
-      {missCandidates.length > 0 && (
+      {!loading && missCandidates.length > 0 && (
         <section id="candidates" className="py-12 px-4 bg-gray-50">
           <div className="container mx-auto">
             <div className="text-center mb-8">
@@ -327,7 +356,7 @@ const Home = () => {
       )}
       
       {/* Section Candidates - MASTER */}
-      {masterCandidates.length > 0 && (
+      {!loading && masterCandidates.length > 0 && (
         <section id="masters" className="py-12 px-4 bg-white">
           <div className="container mx-auto">
             <div className="text-center mb-8">
@@ -385,30 +414,32 @@ const Home = () => {
       )}
       
       {/* Compteurs */}
-      <section className="py-8 px-4 bg-gray-50">
-        <div className="container mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div className="p-4 bg-[#D6B981]/10 rounded-lg">
-              <div className="text-3xl font-bold text-[#96172E] mb-2">{candidates.length}</div>
-              <p className="text-gray-600 uppercase font-medium text-sm">Candidats</p>
-            </div>
-            <div className="p-4 bg-[#D6B981]/10 rounded-lg">
-              <div className="text-3xl font-bold text-[#96172E] mb-2">
-                {candidates.reduce((total, candidate) => total + (candidate.votes || 0), 0).toLocaleString()}
+      {!loading && (
+        <section className="py-8 px-4 bg-gray-50">
+          <div className="container mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div className="p-4 bg-[#D6B981]/10 rounded-lg">
+                <div className="text-3xl font-bold text-[#96172E] mb-2">{candidates.length}</div>
+                <p className="text-gray-600 uppercase font-medium text-sm">Candidats</p>
               </div>
-              <p className="text-gray-600 uppercase font-medium text-sm">Votes totaux</p>
-            </div>
-            <div className="p-4 bg-[#D6B981]/10 rounded-lg">
-              <div className="text-3xl font-bold text-[#96172E] mb-2">21</div>
-              <p className="text-gray-600 uppercase font-medium text-sm">Jours restants</p>
-            </div>
-            <div className="p-4 bg-[#D6B981]/10 rounded-lg">
-              <div className="text-3xl font-bold text-[#96172E] mb-2">2</div>
-              <p className="text-gray-600 uppercase font-medium text-sm">Gagnants</p>
+              <div className="p-4 bg-[#D6B981]/10 rounded-lg">
+                <div className="text-3xl font-bold text-[#96172E] mb-2">
+                  {candidates.reduce((total, candidate) => total + (candidate.votes || 0), 0).toLocaleString()}
+                </div>
+                <p className="text-gray-600 uppercase font-medium text-sm">Votes totaux</p>
+              </div>
+              <div className="p-4 bg-[#D6B981]/10 rounded-lg">
+                <div className="text-3xl font-bold text-[#96172E] mb-2">21</div>
+                <p className="text-gray-600 uppercase font-medium text-sm">Jours restants</p>
+              </div>
+              <div className="p-4 bg-[#D6B981]/10 rounded-lg">
+                <div className="text-3xl font-bold text-[#96172E] mb-2">2</div>
+                <p className="text-gray-600 uppercase font-medium text-sm">Gagnants</p>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
       
       {/* Vote Modal */}
       {showVoteModal && (
@@ -429,8 +460,8 @@ const Home = () => {
               
               {voteSuccess ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Check size={24} className="text-blue-600" />
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Check size={24} className="text-green-600" />
                   </div>
                   <p className="text-gray-700 text-lg mb-2">Votre vote a été enregistré avec succès !</p>
                   <p className="text-gray-500 text-sm">Merci pour votre participation à Miss Master HITBAMAS</p>
@@ -464,33 +495,45 @@ const Home = () => {
                         />
                       </div>
                       
+                      <div>
+                        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Votre numéro de téléphone</label>
+                        <input
+                          id="phone"
+                          type="tel"
+                          value={voterPhone}
+                          onChange={(e) => setVoterPhone(e.target.value)}
+                          required
+                          className="px-4 py-2 w-full border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Entrez votre numéro"
+                        />
+                      </div>
                       
                       <div>
-      <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">Nombre de votes</label>
-      <select
-        id="amount"
-        value={voteAmount}
-        onChange={(e) => setVoteAmount(e.target.value)}
-        className="px-4 py-2 w-full border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      >
-        <option value="1">1 vote (100 FCFA)</option>
-        <option value="5">5 votes (450 FCFA)</option>
-        <option value="10">10 votes (800 FCFA)</option>
-        <option value="25">25 votes (1 800 FCFA)</option>
-      </select>
-    </div>
+                        <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">Nombre de votes</label>
+                        <select
+                          id="amount"
+                          value={voteAmount}
+                          onChange={(e) => setVoteAmount(e.target.value)}
+                          className="px-4 py-2 w-full border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="1">1 vote (100 FCFA)</option>
+                          <option value="5">5 votes (450 FCFA)</option>
+                          <option value="10">10 votes (800 FCFA)</option>
+                          <option value="25">25 votes (1 800 FCFA)</option>
+                        </select>
+                      </div>
                       
-    <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500">
                         En votant, vous acceptez les règles du concours Miss Master HITBAMAS.
                       </div>
                       
                       <button
-                          type="submit"
-                                     className="w-full py-3 bg-[#1a3a6e] hover:bg-blue-800 text-white font-medium rounded transition-colors flex items-center justify-center space-x-2"
-                                                     >
-                                                     <Heart size={18} />
-                                                            <span>Confirmer mon vote</span>
-                                                                                        </button>
+                        type="submit"
+                        className="w-full py-3 bg-[#96172E] hover:bg-[#7d1427] text-white font-medium rounded transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <Heart size={18} />
+                        <span>Confirmer mon vote</span>
+                      </button>
                     </div>
                   </form>
                 </>
@@ -499,30 +542,32 @@ const Home = () => {
           </div>
         </div>
       )}
+      
       {/* Payment Modal */}
-{showPaymentModal && (
-  <MonetbilPayment
-    selectedCandidate={selectedCandidate}
-    voteAmount={voteAmount}
-    voterName={voterName}
-    onPaymentSuccess={handlePaymentSuccess}
-    onPaymentFailure={() => {
-      setShowPaymentModal(false);
-      setShowVoteModal(true);
-    }}
-    onClose={() => setShowPaymentModal(false)}
-  />
-)}
+      {showPaymentModal && (
+        <MonetbilPayment
+          selectedCandidate={selectedCandidate}
+          voteAmount={voteAmount}
+          voterName={voterName}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentFailure={() => {
+            setShowPaymentModal(false);
+            setShowVoteModal(true);
+          }}
+          onClose={() => setShowPaymentModal(false)}
+        />
+      )}
+      
       {/* Footer */}
       <footer className="bg-[#96172E] text-white py-12 px-4">
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <img src="/logo-hitbamas.png" alt="HITBAMAS" className="h-10 mr-2" />
+                <img src="/hitlogo.jpeg" alt="HITBAMAS" className="h-10 mr-2" />
                 <span className="text-xl font-bold">MISS MASTER</span>
               </div>
-              <p className="text-gray-300">Concours annuel valorisant l'excellence académique et le leadership des étudiantes de HITBAMAS.</p>
+              <p className="text-gray-300">Concours annuel valorisant l'excellence académique et le leadership des étudiants de HITBAMAS.</p>
               <div className="flex space-x-4 mt-4">
                 <a href="#" className="bg-white/10 hover:bg-white/20 h-10 w-10 rounded-full flex items-center justify-center transition-colors">
                   <Facebook size={20} />
