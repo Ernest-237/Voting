@@ -20,5 +20,11 @@
     "morgan": "^1.10.0",
     "node-fetch": "^3.3.2",
     "pg": "^8.14.1"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "init-db": "node initDb.js",
+    "dev": "nodemon app.js",
+    "deploy": "npm run init-db && npm start"
   }
 }

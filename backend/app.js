@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const morgan = require('morgan');
 const voteRoutes = require('./routes/votes');
+const { initializeDatabase } = require('./initDb');
 
 // Gestion des erreurs
 const errorHandler = (err, req, res, next) => {
@@ -40,9 +41,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// Configuration PostgreSQL pour Render (avec vos infos du screenshot)
+// Configuration PostgreSQL pour Render
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://Mister_Hitbamas:VOTRE_MOT_DE_PASSE@dpg-cp9t5e21hbls73effsqg-a.frankfurt-postgres.render.com/voting_db_kprb',
+  connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false // Obligatoire pour Render
   }
@@ -71,8 +72,6 @@ async function testDatabaseConnection() {
     if (client) client.release();
   }
 }
-
-testDatabaseConnection();
 
 // Partage du pool avec les routes
 app.locals.pool = pool;
@@ -122,27 +121,43 @@ app.use((req, res) => {
   });
 });
 
-// Démarrage serveur
-const PORT = process.env.PORT || 3001;
-const server = app.listen(PORT, () => {
-  console.log(`
+// Fonction de démarrage principale
+async function startServer() {
+  try {
+    // D'abord tester la connexion
+    await testDatabaseConnection();
+    
+    // Démarrer le serveur
+    const PORT = process.env.PORT || 3001;
+    const server = app.listen(PORT, () => {
+      console.log(`
   🚀 Serveur démarré sur le port ${PORT}
   Environnement: ${process.env.NODE_ENV || 'development'}
   URL Frontend: ${process.env.FRONTEND_URL || 'non configuré'}
-  Connexion DB: ${pool.options.connectionString.split('@')[1] || 'locale'}
-  `);
-});
-
-// Gestion arrêt propre
-['SIGTERM', 'SIGINT'].forEach(signal => {
-  process.on(signal, () => {
-    console.log(`\n${signal} reçu - Arrêt en cours...`);
-    server.close(() => {
-      pool.end();
-      console.log('Toutes connexions fermées');
-      process.exit(0);
+  Connexion DB: ${process.env.DATABASE_URL ? 'configurée' : 'non configurée'}
+      `);
     });
-  });
-});
+
+    // Gestion arrêt propre
+    ['SIGTERM', 'SIGINT'].forEach(signal => {
+      process.on(signal, () => {
+        console.log(`\n${signal} reçu - Arrêt en cours...`);
+        server.close(() => {
+          pool.end();
+          console.log('Toutes connexions fermées');
+          process.exit(0);
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Erreur fatale lors du démarrage du serveur:', error);
+    process.exit(1);
+  }
+}
+
+// Démarrage du serveur
+if (require.main === module) {
+  startServer();
+}
 
 module.exports = app;

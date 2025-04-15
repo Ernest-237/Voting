@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: voting-api
+    env: node
+    buildCommand: npm install
+    startCommand: npm run deploy
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        value: https://voting-app-gmfu.onrender.com
+      - key: NODE_ENV
+        value: production
