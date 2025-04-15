@@ -1,4 +1,4 @@
-// routes/votes.js - Version simplifiée sans authentification par token
+// routes/votes.js - Version adaptée pour PostgreSQL
 const express = require('express');
 const router = express.Router();
 
@@ -71,30 +71,30 @@ router.get('/candidates/:category', async (req, res) => {
     const pool = req.app.locals.pool;
     
     // Vérifier d'abord que la catégorie existe
-    const [categoryRows] = await pool.query(
-      'SELECT id FROM contest_categories WHERE name = ? AND active = true',
+    const categoryResult = await pool.query(
+      'SELECT id FROM contest_categories WHERE name = $1 AND active = true',
       [category]
     );
     
-    if (categoryRows.length === 0) {
+    if (categoryResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
         error: 'Category not found or inactive' 
       });
     }
     
-    const [candidates] = await pool.query(
-      `SELECT c.id, c.name, c.department, c.number, c.photo_url as photoUrl, 
-       c.description, c.type, c.category_id as categoryId,
+    const result = await pool.query(
+      `SELECT c.id, c.name, c.department, c.number, c.photo_url as "photoUrl", 
+       c.description, c.type, c.category_id as "categoryId",
        COALESCE(SUM(v.vote_count), 0) as votes
        FROM candidates c
        LEFT JOIN votes v ON v.candidate_id = c.id AND v.payment_status = 'completed'
-       WHERE c.active = true AND c.category_id = ?
+       WHERE c.active = true AND c.category_id = $1
        GROUP BY c.id`,
-      [categoryRows[0].id]
+      [categoryResult.rows[0].id]
     );
     
-    res.json({ success: true, data: candidates });
+    res.json({ success: true, data: result.rows });
   } catch (error) {
     handleDbError(res, error, 'fetching candidates by category');
   }
@@ -116,12 +116,12 @@ router.post('/votes', async (req, res) => {
     const pool = req.app.locals.pool;
     
     // Vérifier que le candidat existe et est actif
-    const [candidate] = await pool.query(
-      'SELECT id FROM candidates WHERE id = ? AND active = true',
+    const candidateResult = await pool.query(
+      'SELECT id FROM candidates WHERE id = $1 AND active = true',
       [candidateId]
     );
     
-    if (candidate.length === 0) {
+    if (candidateResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
         error: 'Candidate not found or inactive' 
@@ -129,17 +129,18 @@ router.post('/votes', async (req, res) => {
     }
     
     // Enregistrer le vote
-    const [result] = await pool.query(
+    const result = await pool.query(
       `INSERT INTO votes 
        (candidate_id, voter_name, voter_phone, vote_count, amount, transaction_id, payment_status)
-       VALUES (?, ?, ?, ?, ?, ?, 'completed')`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'completed')
+       RETURNING id`,
       [candidateId, voterName, voterPhone || null, voteCount, amount, transactionId]
     );
     
     res.status(201).json({ 
       success: true,
       data: { 
-        voteId: result.insertId,
+        voteId: result.rows[0].id,
         candidateId,
         voteCount,
         amount
@@ -166,19 +167,19 @@ router.post('/admin/login', async (req, res) => {
     const pool = req.app.locals.pool;
     
     // Note: En production, utilisez bcrypt pour comparer les mots de passe hashés
-    const [users] = await pool.query(
-      'SELECT id, username, role FROM admin_users WHERE username = ? AND password = ? AND active = true',
+    const result = await pool.query(
+      'SELECT id, username, role FROM admin_users WHERE username = $1 AND password = $2 AND active = true',
       [username, password]
     );
     
-    if (users.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({ 
         success: false, 
         error: 'Invalid credentials or inactive account' 
       });
     }
     
-    const user = users[0];
+    const user = result.rows[0];
     
     // Simplement renvoyer les informations utilisateur sans token
     res.json({ 
@@ -203,11 +204,11 @@ router.post('/admin/login', async (req, res) => {
 router.get('/admin/categories', async (req, res) => {
   try {
     const pool = req.app.locals.pool;
-    const [categories] = await pool.query(
+    const result = await pool.query(
       'SELECT id, name, description, active FROM contest_categories'
     );
     
-    res.json({ success: true, data: categories });
+    res.json({ success: true, data: result.rows });
   } catch (error) {
     handleDbError(res, error, 'fetching categories');
   }
@@ -218,15 +219,15 @@ router.post('/admin/categories', validateCategory, async (req, res) => {
     const { name, description } = req.body;
     const pool = req.app.locals.pool;
     
-    const [result] = await pool.query(
-      'INSERT INTO contest_categories (name, description, active) VALUES (?, ?, true)',
+    const result = await pool.query(
+      'INSERT INTO contest_categories (name, description, active) VALUES ($1, $2, true) RETURNING id',
       [name.trim(), description?.trim() || null]
     );
     
     res.status(201).json({ 
       success: true,
       data: { 
-        id: result.insertId,
+        id: result.rows[0].id,
         name,
         description: description || null
       },
@@ -244,11 +245,11 @@ router.get('/admin/candidates', async (req, res) => {
     const pool = req.app.locals.pool;
     
     let query = `
-      SELECT c.id, c.name, c.department, c.number, c.photo_url as photoUrl, 
-      c.description, c.type, c.category_id as categoryId, c.active,
-      cat.name as categoryName,
-      COALESCE(SUM(v.vote_count), 0) as totalVotes,
-      COALESCE(SUM(v.amount), 0) as totalAmount
+      SELECT c.id, c.name, c.department, c.number, c.photo_url as "photoUrl", 
+      c.description, c.type, c.category_id as "categoryId", c.active,
+      cat.name as "categoryName",
+      COALESCE(SUM(v.vote_count), 0) as "totalVotes",
+      COALESCE(SUM(v.amount), 0) as "totalAmount"
       FROM candidates c
       LEFT JOIN votes v ON v.candidate_id = c.id AND v.payment_status = 'completed'
       JOIN contest_categories cat ON c.category_id = cat.id
@@ -257,15 +258,15 @@ router.get('/admin/candidates', async (req, res) => {
     const params = [];
     
     if (category) {
-      query += ' WHERE c.category_id = ?';
+      query += ' WHERE c.category_id = $1';
       params.push(category);
     }
     
-    query += ' GROUP BY c.id ORDER BY c.name';
+    query += ' GROUP BY c.id, cat.name ORDER BY c.name';
     
-    const [candidates] = await pool.query(query, params);
+    const result = await pool.query(query, params);
     
-    res.json({ success: true, data: candidates });
+    res.json({ success: true, data: result.rows });
   } catch (error) {
     handleDbError(res, error, 'fetching candidates');
   }
@@ -277,22 +278,23 @@ router.post('/admin/candidates', validateCandidate, async (req, res) => {
     const pool = req.app.locals.pool;
     
     // Vérifier que la catégorie existe
-    const [category] = await pool.query(
-      'SELECT id FROM contest_categories WHERE id = ?',
+    const categoryResult = await pool.query(
+      'SELECT id FROM contest_categories WHERE id = $1',
       [categoryId]
     );
     
-    if (category.length === 0) {
+    if (categoryResult.rows.length === 0) {
       return res.status(400).json({ 
         success: false, 
         error: 'Specified category does not exist' 
       });
     }
     
-    const [result] = await pool.query(
+    const result = await pool.query(
       `INSERT INTO candidates 
        (name, department, number, photo_url, description, type, category_id, active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, true)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+       RETURNING id`,
       [
         name.trim(),
         department?.trim() || null,
@@ -305,19 +307,19 @@ router.post('/admin/candidates', validateCandidate, async (req, res) => {
     );
     
     // Récupérer le candidat créé avec les infos complètes
-    const [newCandidate] = await pool.query(
-      `SELECT c.id, c.name, c.department, c.number, c.photo_url as photoUrl, 
-       c.description, c.type, c.category_id as categoryId, c.active,
-       cat.name as categoryName
+    const newCandidateResult = await pool.query(
+      `SELECT c.id, c.name, c.department, c.number, c.photo_url as "photoUrl", 
+       c.description, c.type, c.category_id as "categoryId", c.active,
+       cat.name as "categoryName"
        FROM candidates c
        JOIN contest_categories cat ON c.category_id = cat.id
-       WHERE c.id = ?`,
-      [result.insertId]
+       WHERE c.id = $1`,
+      [result.rows[0].id]
     );
     
     res.status(201).json({ 
       success: true,
-      data: newCandidate[0],
+      data: newCandidateResult.rows[0],
       message: 'Candidate created successfully' 
     });
   } catch (error) {
@@ -331,12 +333,12 @@ router.delete('/admin/candidates/:id', async (req, res) => {
     const pool = req.app.locals.pool;
     
     // Vérifier d'abord que le candidat existe
-    const [candidate] = await pool.query(
-      'SELECT id FROM candidates WHERE id = ?',
+    const candidateResult = await pool.query(
+      'SELECT id FROM candidates WHERE id = $1',
       [id]
     );
     
-    if (candidate.length === 0) {
+    if (candidateResult.rows.length === 0) {
       return res.status(404).json({ 
         success: false, 
         error: 'Candidate not found' 
@@ -345,7 +347,7 @@ router.delete('/admin/candidates/:id', async (req, res) => {
     
     // Désactiver plutôt que supprimer pour garder l'historique
     await pool.query(
-      'UPDATE candidates SET active = false WHERE id = ?',
+      'UPDATE candidates SET active = false WHERE id = $1',
       [id]
     );
     
@@ -364,42 +366,45 @@ router.get('/admin/stats', async (req, res) => {
     const pool = req.app.locals.pool;
     
     // Nombre total de votes
-    const [totalVotes] = await pool.query(
-      'SELECT SUM(vote_count) as totalVotes, SUM(amount) as totalAmount FROM votes WHERE payment_status = "completed"'
+    const totalVotesResult = await pool.query(
+      'SELECT SUM(vote_count) as "totalVotes", SUM(amount) as "totalAmount" FROM votes WHERE payment_status = $1',
+      ['completed']
     );
     
     // Votes par catégorie
-    const [votesByCategory] = await pool.query(
+    const votesByCategoryResult = await pool.query(
       `SELECT cat.id, cat.name, 
-       SUM(v.vote_count) as totalVotes, 
-       SUM(v.amount) as totalAmount
+       SUM(v.vote_count) as "totalVotes", 
+       SUM(v.amount) as "totalAmount"
        FROM votes v
        JOIN candidates c ON v.candidate_id = c.id
        JOIN contest_categories cat ON c.category_id = cat.id
-       WHERE v.payment_status = 'completed'
-       GROUP BY cat.id`
+       WHERE v.payment_status = $1
+       GROUP BY cat.id, cat.name`,
+      ['completed']
     );
     
     // Top candidats
-    const [topCandidates] = await pool.query(
+    const topCandidatesResult = await pool.query(
       `SELECT c.id, c.name, c.type, cat.name as category,
-       SUM(v.vote_count) as totalVotes
+       SUM(v.vote_count) as "totalVotes"
        FROM votes v
        JOIN candidates c ON v.candidate_id = c.id
        JOIN contest_categories cat ON c.category_id = cat.id
-       WHERE v.payment_status = 'completed'
-       GROUP BY c.id
-       ORDER BY totalVotes DESC
-       LIMIT 5`
+       WHERE v.payment_status = $1
+       GROUP BY c.id, cat.name
+       ORDER BY "totalVotes" DESC
+       LIMIT 5`,
+      ['completed']
     );
     
     res.json({
       success: true,
       data: {
-        totalVotes: totalVotes[0].totalVotes || 0,
-        totalAmount: totalVotes[0].totalAmount || 0,
-        byCategory: votesByCategory,
-        topCandidates
+        totalVotes: totalVotesResult.rows[0]?.totalvotes || 0,
+        totalAmount: totalVotesResult.rows[0]?.totalamount || 0,
+        byCategory: votesByCategoryResult.rows,
+        topCandidates: topCandidatesResult.rows
       }
     });
   } catch (error) {

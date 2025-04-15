@@ -3,11 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 const morgan = require('morgan');
-const voteRoutes = require('./routes/votes'); // Importation des routes
+const voteRoutes = require('./routes/votes');
 
-// Gestion des erreurs simplifiée directement dans app.js
+// Gestion des erreurs
 const errorHandler = (err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -20,15 +20,18 @@ const app = express();
 
 // Configuration de la limite de taux
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limite chaque IP à 100 requêtes par fenêtre
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // Middlewares
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: [
+    process.env.FRONTEND_URL || 'https://voting-app-gmfu.onrender.com',
+    'http://localhost:5173' // Pour le développement local
+  ],
   credentials: true
 }));
 app.use(helmet());
@@ -37,86 +40,108 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// Configuration de la base de données
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'hitbamas',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  timezone: '+00:00'
+// Configuration PostgreSQL pour Render (avec vos infos du screenshot)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://Mister_Hitbamas:VOTRE_MOT_DE_PASSE@dpg-cp9t5e21hbls73effsqg-a.frankfurt-postgres.render.com/voting_db_kprb',
+  ssl: {
+    rejectUnauthorized: false // Obligatoire pour Render
+  }
 });
 
-// Test de connexion à la base de données
+// Test de connexion amélioré
 async function testDatabaseConnection() {
-  let connection;
+  let client;
   try {
-    connection = await pool.getConnection();
-    console.log('✅ Connecté à la base de données MySQL avec succès');
-    const [rows] = await connection.query('SELECT 1 + 1 AS result');
-    console.log('✅ Test de requête SQL réussi. Résultat:', rows[0].result);
+    client = await pool.connect();
+    console.log('✅ Connecté à PostgreSQL sur Render');
+    
+    // Test plus complet
+    const dbInfo = await client.query(`
+      SELECT 
+        current_database() AS db_name,
+        version() AS db_version,
+        pg_size_pretty(pg_database_size(current_database())) AS db_size
+    `);
+    
+    console.log('🔍 Info base de données:', dbInfo.rows[0]);
   } catch (err) {
-    console.error('❌ Erreur de connexion à la base de données:', err.message);
+    console.error('❌ Erreur de connexion:', err.stack);
     process.exit(1);
   } finally {
-    if (connection) connection.release();
+    if (client) client.release();
   }
 }
 
-// Exécuter le test de connexion
 testDatabaseConnection();
 
-// Make pool available to routes
+// Partage du pool avec les routes
 app.locals.pool = pool;
 
-// Route de test pour la base de données
+// Route de santé pour Render
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Route de test DB améliorée
 app.get('/api/test-db', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT NOW() AS server_time, DATABASE() AS db_name, VERSION() AS db_version');
+    const { rows } = await pool.query(`
+      SELECT 
+        NOW() AS server_time,
+        current_database() AS db_name, 
+        version() AS db_version,
+        current_user AS db_user,
+        inet_server_addr() AS db_host
+    `);
+    
     res.json({
       success: true,
       data: rows[0],
-      message: 'Connexion à la base de données établie'
+      environment: process.env.NODE_ENV || 'development'
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: 'Échec de la connexion à la base de données',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    errorHandler(err, req, res);
   }
 });
 
-// Utilisation des routes - toutes les routes dans votes.js seront préfixées par '/api'
+// Routes API
 app.use('/api', voteRoutes);
 
 // Gestion des erreurs
 app.use(errorHandler);
 
-// Capture des routes non trouvées
+// 404
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    error: 'Endpoint not found'
+    error: 'Endpoint not found',
+    path: req.path
   });
 });
 
-// Démarrer le serveur
+// Démarrage serveur
 const PORT = process.env.PORT || 3001;
 const server = app.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
-  console.log(`Environnement: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`URL frontend autorisée: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(`
+  🚀 Serveur démarré sur le port ${PORT}
+  Environnement: ${process.env.NODE_ENV || 'development'}
+  URL Frontend: ${process.env.FRONTEND_URL || 'non configuré'}
+  Connexion DB: ${pool.options.connectionString.split('@')[1] || 'locale'}
+  `);
 });
 
-// Gestion des arrêts propres
-process.on('SIGTERM', () => {
-  server.close(() => {
-    console.log('Process terminated');
-    pool.end();
-    process.exit(0);
+// Gestion arrêt propre
+['SIGTERM', 'SIGINT'].forEach(signal => {
+  process.on(signal, () => {
+    console.log(`\n${signal} reçu - Arrêt en cours...`);
+    server.close(() => {
+      pool.end();
+      console.log('Toutes connexions fermées');
+      process.exit(0);
+    });
   });
 });
 

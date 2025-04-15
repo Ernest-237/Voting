@@ -177,7 +177,7 @@ const Home = () => {
           {/* Top Bar */}
           <div className="flex justify-between items-center py-2 px-4 text-sm border-b border-opacity-20 border-white">
             <div className="flex space-x-4">
-              <a href="tel:+237000000000" className="hover:text-[#D6B981]">+237 000 000 000</a>
+              <a href="tel:+237 695965175" className="hover:text-[#D6B981]">+237 +237 695965175</a>
               <a href="mailto:contact@hitbamas.org" className="hover:text-[#D6B981]">contact@hitbamas.org</a>
             </div>
 
