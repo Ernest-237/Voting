@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Heart, ArrowLeft, User, BookOpen, Award, Calendar } from 'lucide-react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { createClient } from '@supabase/supabase-js';
 
-const BASE_URL = 'http://localhost:3001';
+// Configuration Supabase - utilisez les mêmes clés que dans votre composant Home
+const SUPABASE_URL = 'https://vdnbkevncovdssvgyrzr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbmJrZXZuY292ZHNzdmd5cnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3NDU1MjMsImV4cCI6MjA2MDMyMTUyM30.BLKZQ6GJkPhEa6i79efv7QBmnfP_VtTN-9ON67w4JfY';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const CandidatePage = () => {
   const { id } = useParams();
@@ -23,19 +27,38 @@ const CandidatePage = () => {
     const fetchCandidate = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${BASE_URL}/api/candidate/${id}`);
         
-        if (!response.ok) {
+        // Récupérer le candidat depuis Supabase
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (error) {
           throw new Error('Candidat non trouvé');
         }
         
-        const data = await response.json();
-        
-        if (!data.success || !data.data) {
+        if (!data) {
           throw new Error('Données du candidat non disponibles');
         }
         
-        setCandidate(data.data);
+        // Transformer les données pour correspondre au format attendu par le composant
+        const transformedData = {
+          id: data.id,
+          name: data.name,
+          photoUrl: data.photo_url,
+          department: data.department,
+          type: data.type,
+          number: data.number,
+          votes: data.votes || 0,
+          age: data.age,
+          speciality: data.speciality,
+          level: data.level,
+          description: data.description
+        };
+        
+        setCandidate(transformedData);
       } catch (err) {
         console.error("Erreur lors du chargement du candidat:", err);
         setError(err.message);
@@ -69,12 +92,76 @@ const CandidatePage = () => {
       alert("Veuillez entrer votre nom");
       return;
     }
+    
+    if (!voterPhone.trim()) {
+      alert("Veuillez entrer votre numéro de téléphone");
+      return;
+    }
 
     // Passer à l'étape de paiement
     setShowVoteModal(false);
     setTimeout(() => {
       setShowPaymentModal(true);
     }, 300);
+  };
+
+  // Gérer le succès du paiement
+  const handlePaymentSuccess = async (transactionData) => {
+    try {
+      // Insérer le vote dans Supabase
+      const { data: voteData, error: voteError } = await supabase
+        .from('votes')
+        .insert([
+          {
+            candidate_id: candidate.id,
+            voter_name: voterName,
+            voter_phone: voterPhone,
+            vote_count: parseInt(voteAmount),
+            amount: getAmount(voteAmount),
+            transaction_id: transactionData?.transaction_UUID || 'test-transaction',
+            payment_status: 'completed'
+          }
+        ])
+        .select();
+
+      if (voteError) {
+        throw voteError;
+      }
+
+      // Mettre à jour le nombre de votes du candidat dans Supabase
+      const { data: updateData, error: updateError } = await supabase
+        .from('candidates')
+        .update({ votes: candidate.votes + parseInt(voteAmount) })
+        .eq('id', candidate.id)
+        .select();
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Mettre à jour localement
+      setCandidate(prev => ({
+        ...prev,
+        votes: prev.votes + parseInt(voteAmount)
+      }));
+      
+      setShowPaymentModal(false);
+      
+      // Afficher le message de succès
+      setVoteSuccess(true);
+      setShowVoteModal(true);
+      
+      // Fermer automatiquement après quelques secondes
+      setTimeout(() => {
+        setShowVoteModal(false);
+        setVoteSuccess(false);
+      }, 3000);
+    } catch (error) {
+      console.error("Erreur:", error);
+      alert("Une erreur est survenue lors de l'enregistrement de votre vote");
+      setShowPaymentModal(false);
+      setShowVoteModal(true);
+    }
   };
 
   // Helper pour obtenir le montant du vote
@@ -277,6 +364,7 @@ const CandidatePage = () => {
                           type="tel"
                           value={voterPhone}
                           onChange={(e) => setVoterPhone(e.target.value)}
+                          required
                           className="px-4 py-2 w-full border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="Entrez votre numéro"
                         />
@@ -312,6 +400,33 @@ const CandidatePage = () => {
                   </form>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vous devrez importer votre composant MonetbilPayment ici */}
+      {showPaymentModal && (
+        <div>
+          {/* Remplacez ceci par l'import de votre composant MonetbilPayment */}
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6">
+              <h3 className="text-xl font-bold mb-4">Paiement</h3>
+              <p>Intégrez ici votre composant MonetbilPayment</p>
+              <div className="flex space-x-4 mt-4">
+                <button 
+                  className="px-4 py-2 bg-gray-200 rounded"
+                  onClick={() => setShowPaymentModal(false)}
+                >
+                  Annuler
+                </button>
+                <button 
+                  className="px-4 py-2 bg-green-600 text-white rounded"
+                  onClick={() => handlePaymentSuccess({transaction_UUID: 'test-transaction'})}
+                >
+                  Simuler paiement réussi
+                </button>
+              </div>
             </div>
           </div>
         </div>
