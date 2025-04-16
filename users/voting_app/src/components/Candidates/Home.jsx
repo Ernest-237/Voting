@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Heart, X, Check, ChevronRight, Instagram, Facebook, Twitter, Menu, Phone } from 'lucide-react';
+import { Heart, X, Check, ChevronRight, Instagram, Facebook, Twitter, Menu, Phone, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import MonetbilPayment from './MonetbilPayment';
 import { createClient } from '@supabase/supabase-js';
 
-// Configuration Supabase - à remplacer par vos propres clés
+// Configuration Supabase
 const SUPABASE_URL = 'https://vdnbkevncovdssvgyrzr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbmJrZXZuY292ZHNzdmd5cnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3NDU1MjMsImV4cCI6MjA2MDMyMTUyM30.BLKZQ6GJkPhEa6i79efv7QBmnfP_VtTN-9ON67w4JfY';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -31,7 +30,6 @@ const Home = () => {
       try {
         setLoading(true);
         
-        // Récupérer tous les candidats depuis Supabase
         const { data, error } = await supabase
           .from('candidates')
           .select('*')
@@ -41,7 +39,6 @@ const Home = () => {
           throw error;
         }
         
-        // Transformer les données pour correspondre au format attendu par le composant
         const transformedData = data.map(candidate => ({
           id: candidate.id,
           name: candidate.name,
@@ -105,57 +102,6 @@ const Home = () => {
     }, 300);
   };
 
-  // Gérer le succès du paiement
-  const handlePaymentSuccess = async (transactionData) => {
-    try {
-      // Insérer le vote dans Supabase
-      const { data: voteData, error: voteError } = await supabase
-        .from('votes')
-        .insert([{
-          candidate_id: selectedCandidate.id,
-          voter_name: voterName,
-          voter_phone: voterPhone,
-          vote_count: parseInt(voteAmount),
-          amount: getAmount(voteAmount),
-          transaction_id: transactionData?.transaction_UUID || 'test-transaction',
-          payment_status: 'completed'
-        }]);
-  
-      if (voteError) throw voteError;
-  
-      // Mettre à jour le nombre de votes du candidat dans Supabase
-      const { error: updateError } = await supabase
-        .from('candidates')
-        .update({ votes: selectedCandidate.votes + parseInt(voteAmount) })
-        .eq('id', selectedCandidate.id);
-  
-      if (updateError) throw updateError;
-  
-      // Recharger les candidats depuis Supabase
-      const { data: newCandidates } = await supabase
-        .from('candidates')
-        .select('*')
-        .order('number', { ascending: true });
-  
-      setCandidates(newCandidates);
-      
-      setShowPaymentModal(false);
-      setVoteSuccess(true);
-      setShowVoteModal(true);
-  
-      setTimeout(() => {
-        setShowVoteModal(false);
-        setSelectedCandidate(null);
-        setVoteSuccess(false);
-      }, 3000);
-    } catch (error) {
-      console.error("Erreur:", error);
-      alert("Une erreur est survenue lors de l'enregistrement de votre vote");
-      setShowPaymentModal(false);
-      setShowVoteModal(true);
-    }
-  };
-
   // Helper pour obtenir le montant
   const getAmount = (votes) => {
     switch(parseInt(votes)) {
@@ -166,6 +112,114 @@ const Home = () => {
       default: return 100;
     }
   };
+
+  // Modifier la fonction confirmPayment pour générer et télécharger un coupon
+// Modifier la fonction confirmPayment pour générer et télécharger un coupon
+const confirmPayment = async () => {
+  try {
+    // Générer le contenu du coupon
+    const couponContent = `
+=================================================
+        COUPON DE PAIEMENT - MISS MASTER HITBAMAS
+=================================================
+
+INFORMATIONS DU VOTE:
+--------------------
+Date: ${new Date().toLocaleString()}
+ID Référence: VOTE-${Date.now().toString().slice(-8)}
+
+INFORMATIONS ÉLECTEUR:
+--------------------
+Nom: ${voterName}
+Téléphone: ${voterPhone}
+
+INFORMATIONS CANDIDAT:
+--------------------
+Candidat choisi: ${selectedCandidate?.name}
+Numéro du candidat: ${selectedCandidate?.number}
+Catégorie: ${selectedCandidate?.type === 'miss' ? 'MISS' : 'MASTER'}
+Département: ${selectedCandidate?.department}
+
+DÉTAILS DU PAIEMENT:
+------------------
+Nombre de votes: ${voteAmount}
+Montant à payer: ${getAmount(voteAmount)} FCFA
+
+INSTRUCTIONS:
+-----------
+1. Présentez ce coupon à l'un des points de paiement suivants:
+   - Au gestionaire du service de vote
+   - Bureau des élections HITBAMAS
+   - Enligne sur whatsapp (+237 695965175)
+2. Effectuez le paiement du montant indiqué
+3. Conservez votre reçu de paiement
+4. Votre vote sera validé après confirmation du paiement
+
+=================================================
+        MERCI POUR VOTRE PARTICIPATION!
+=================================================
+`;
+
+    // Séparer la partie Supabase du téléchargement du coupon
+    try {
+      // Insérer les données du vote dans Supabase (avec statut "pending" ou similaire)
+      const { data: voteData, error: voteError } = await supabase
+        .from('votes')
+        .insert([{
+          candidate_id: selectedCandidate.id,
+          voter_name: voterName,
+          voter_phone: voterPhone,
+          vote_count: parseInt(voteAmount),
+          amount: getAmount(voteAmount),
+          transaction_id: `coupon-${Date.now()}`,
+          payment_status: 'waiting_coupon_payment'
+        }]);
+
+      if (voteError) console.error("Erreur Supabase:", voteError);
+      // Continuer même en cas d'erreur Supabase
+    } catch (supabaseError) {
+      console.error("Erreur Supabase:", supabaseError);
+      // Continuer même en cas d'erreur Supabase
+    }
+
+    // Générer et télécharger le coupon de toute façon
+    // Créer un objet Blob avec le contenu du coupon
+    const couponBlob = new Blob([couponContent], { type: 'text/plain' });
+    
+    // Créer une URL pour le blob
+    const couponUrl = URL.createObjectURL(couponBlob);
+    
+    // Créer un élément <a> temporaire pour le téléchargement
+    const downloadLink = document.createElement('a');
+    downloadLink.href = couponUrl;
+    downloadLink.download = `Coupon_Vote_${selectedCandidate?.name.replace(/\s+/g, '_')}_${Date.now()}.txt`;
+    
+    // Ajouter l'élément au DOM et déclencher le clic
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    
+    // Nettoyer
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(couponUrl);
+
+    // Fermer le modal de paiement et montrer un message de succès
+    setShowPaymentModal(false);
+    setVoteSuccess(true);
+    setShowVoteModal(true);
+
+    // Fermer automatiquement après quelques secondes
+    setTimeout(() => {
+      setShowVoteModal(false);
+      setSelectedCandidate(null);
+      setVoteSuccess(false);
+    }, 3000);
+    
+  } catch (error) {
+    console.error("Erreur:", error);
+    alert("Une erreur est survenue lors de la génération de votre coupon");
+    setShowPaymentModal(false);
+  }
+};
 
   // Toggle pour le menu mobile
   const toggleMobileMenu = () => {
@@ -448,12 +502,12 @@ const Home = () => {
               
               {voteSuccess ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Check size={24} className="text-green-600" />
-                  </div>
-                  <p className="text-gray-700 text-lg mb-2">Votre vote a été enregistré avec succès !</p>
-                  <p className="text-gray-500 text-sm">Merci pour votre participation à Miss Master HITBAMAS</p>
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check size={24} className="text-green-600" />
                 </div>
+                <p className="text-gray-700 text-lg mb-2">Votre coupon a été téléchargé avec succès !</p>
+                <p className="text-gray-500 text-sm">Présentez-le à un point de paiement pour finaliser votre vote pour Miss Master HITBAMAS</p>
+              </div>
               ) : (
                 <>
                   <div className="flex items-center space-x-4 mb-6">
@@ -531,20 +585,84 @@ const Home = () => {
         </div>
       )}
       
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <MonetbilPayment
-          selectedCandidate={selectedCandidate}
-          voteAmount={voteAmount}
-          voterName={voterName}
-          onPaymentSuccess={handlePaymentSuccess}
-          onPaymentFailure={() => {
-            setShowPaymentModal(false);
-            setShowVoteModal(true);
-          }}
-          onClose={() => setShowPaymentModal(false)}
-        />
-      )}
+     {/* Payment Modal */}
+{showPaymentModal && (
+  <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-800">Finalisez votre paiement</h3>
+          <button 
+            onClick={() => setShowPaymentModal(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+            <div className="flex items-center mb-2">
+              <MessageSquare className="text-blue-500 mr-2" />
+              <h4 className="font-medium text-blue-800">Instructions importantes</h4>
+            </div>
+            <p className="text-sm text-gray-700">
+              🎉 Finalisez votre vote en quelques étapes simples !<br /><br />
+              Cher utilisateur, votre voix compte énormément ! Pour valider définitivement votre(vos) vote(s), il vous suffit de :<br /><br />
+              1️⃣ Télécharger votre coupon de paiement ci-dessous.<br />
+              2️⃣ Présentez ce coupon à l'un des points de paiement suivants :<br />
+              <span className="font-semibold">* Kiosque Orange Money sur le campus</span><br />
+              <span className="font-semibold">* Bureau des élections HITBAMAS</span><br /><br />
+              💡 <span className="font-semibold">Rappel :</span> Votre vote de {voteAmount} fois correspond à un montant de {getAmount(voteAmount)} FCFA.<br /><br />
+              Après paiement, conservez votre reçu comme preuve.<br /><br />
+              Un immense merci pour votre participation et votre compréhension ! Ensemble, faisons la différence. 🙌
+            </p>
+          </div>
+          
+          <div className="border rounded-lg overflow-hidden">
+            <div className="bg-gray-50 p-3 border-b">
+              <h4 className="font-medium text-gray-800">Récapitulatif de votre vote</h4>
+            </div>
+            <div className="p-4">
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-600">Candidat</span>
+                <span className="font-medium">{selectedCandidate?.name}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-600">Nombre de votes</span>
+                <span className="font-medium">{voteAmount}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-600">Montant total</span>
+                <span className="font-medium">{getAmount(voteAmount)} FCFA</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-gray-600">Votre numéro</span>
+                <span className="font-medium">{voterPhone}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <button 
+              className="w-full py-3 bg-[#96172E] hover:bg-[#7d1427] text-white font-medium rounded-lg transition-colors flex items-center justify-center space-x-2"
+              onClick={confirmPayment}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              <span>Télécharger mon coupon de paiement</span>
+            </button>
+          </div>
+          
+          <div className="text-xs text-gray-500 text-center">
+            Après avoir effectué le paiement avec votre coupon, votre vote sera définitivement validé.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
       
       {/* Footer */}
       <footer className="bg-[#96172E] text-white py-12 px-4">
@@ -590,7 +708,7 @@ const Home = () => {
               <ul className="space-y-2 text-gray-300">
                 <li>HITBAMAS, Yaoundé</li>
                 <li>missmaster@hitbamas.org</li>
-                <li>+237 000 000 000</li>
+                <li>+237 695965175</li>
               </ul>
             </div>
           </div>
