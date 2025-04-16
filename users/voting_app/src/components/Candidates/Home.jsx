@@ -429,7 +429,7 @@ const Home = () => {
                 <p className="text-gray-600 uppercase font-medium text-sm">Votes totaux</p>
               </div>
               <div className="p-4 bg-[#D6B981]/10 rounded-lg">
-                <div className="text-3xl font-bold text-[#96172E] mb-2">21</div>
+                <div className="text-3xl font-bold text-[#96172E] mb-2">2</div>
                 <p className="text-gray-600 uppercase font-medium text-sm">Jours restants</p>
               </div>
               <div className="p-4 bg-[#D6B981]/10 rounded-lg">
