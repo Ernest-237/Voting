@@ -111,50 +111,38 @@ const Home = () => {
       // Insérer le vote dans Supabase
       const { data: voteData, error: voteError } = await supabase
         .from('votes')
-        .insert([
-          {
-            candidate_id: selectedCandidate.id,
-            voter_name: voterName,
-            voter_phone: voterPhone,
-            vote_count: parseInt(voteAmount),
-            amount: getAmount(voteAmount),
-            transaction_id: transactionData?.transaction_UUID || 'test-transaction',
-            payment_status: 'completed'
-          }
-        ])
-        .select();
-
-      if (voteError) {
-        throw voteError;
-      }
-
+        .insert([{
+          candidate_id: selectedCandidate.id,
+          voter_name: voterName,
+          voter_phone: voterPhone,
+          vote_count: parseInt(voteAmount),
+          amount: getAmount(voteAmount),
+          transaction_id: transactionData?.transaction_UUID || 'test-transaction',
+          payment_status: 'completed'
+        }]);
+  
+      if (voteError) throw voteError;
+  
       // Mettre à jour le nombre de votes du candidat dans Supabase
-      const { data: updateData, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('candidates')
         .update({ votes: selectedCandidate.votes + parseInt(voteAmount) })
-        .eq('id', selectedCandidate.id)
-        .select();
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Mettre à jour localement seulement après confirmation de Supabase
-      const updatedCandidates = candidates.map(c => {
-        if (c.id === selectedCandidate.id) {
-          return {...c, votes: c.votes + parseInt(voteAmount)};
-        }
-        return c;
-      });
+        .eq('id', selectedCandidate.id);
+  
+      if (updateError) throw updateError;
+  
+      // Recharger les candidats depuis Supabase
+      const { data: newCandidates } = await supabase
+        .from('candidates')
+        .select('*')
+        .order('number', { ascending: true });
+  
+      setCandidates(newCandidates);
       
-      setCandidates(updatedCandidates);
       setShowPaymentModal(false);
-      
-      // Afficher le message de succès
       setVoteSuccess(true);
       setShowVoteModal(true);
-      
-      // Fermer automatiquement après quelques secondes
+  
       setTimeout(() => {
         setShowVoteModal(false);
         setSelectedCandidate(null);
