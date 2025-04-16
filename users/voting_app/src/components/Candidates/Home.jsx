@@ -612,8 +612,11 @@ INSTRUCTIONS:
               1️⃣ Télécharger votre coupon de paiement ci-dessous.<br />
               2️⃣ Payeé a l'un des numero qui suit puis presenter votre capture de paiment au responsable de vote :<br />
               <span className="font-semibold">* Orange Money : +237 695965175</span><br />
-              <span className="font-semibold">* MTN Mobile Money : +237 683500188</span><br /><br />
-              💡 <span className="font-semibold">Rappel :</span> Votre vote de {voteAmount} fois correspond à un montant de {getAmount(voteAmount)} FCFA.<br /><br />
+              <span className="font-semibold">* MTN MobileMoney : +237 683500188</span><br /><br />
+
+              💡 <span className="font-semibold">Rappel :</span> Le nom du compte de paiement Orange Money est :<span className="font-semibold">Tchamgoue Julienne.</span><br /><br />
+              💡 <span className="font-semibold">Rappel :</span> Le nom du compte de MTN MoMo est :<span className="font-semibold">Toko Ngamo pascal.</span><br /><br />
+              💡 <span className="font-semibold">Rappel :</span> Votre vote de {getAmount(voteAmount)} FCFA correspond à un nombre de vote {voteAmount} fois.<br /><br />
               Après paiement, conservez votre reçu comme preuve.<br /><br />
               Un immense merci pour votre participation et votre compréhension ! Ensemble, faisons la différence. ✨🧧
             </p>
