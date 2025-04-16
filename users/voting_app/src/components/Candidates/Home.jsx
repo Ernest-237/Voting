@@ -151,7 +151,7 @@ INSTRUCTIONS:
    - Au gestionaire du service de vote
    - Bureau des élections HITBAMAS
    - Enligne sur whatsapp (+237 695965175)
-2. Effectuez le paiement du montant indiqué
+2. Effectuez le paiement du montant indiqué 
 3. Conservez votre reçu de paiement
 4. Votre vote sera validé après confirmation du paiement
 
@@ -610,12 +610,12 @@ INSTRUCTIONS:
               🎉 Finalisez votre vote en quelques étapes simples !<br /><br />
               Cher utilisateur, votre voix compte énormément ! Pour valider définitivement votre(vos) vote(s), il vous suffit de :<br /><br />
               1️⃣ Télécharger votre coupon de paiement ci-dessous.<br />
-              2️⃣ Présentez ce coupon à l'un des points de paiement suivants :<br />
-              <span className="font-semibold">* Kiosque Orange Money sur le campus</span><br />
-              <span className="font-semibold">* Bureau des élections HITBAMAS</span><br /><br />
+              2️⃣ Payeé a l'un des numero qui suit puis presenter votre capture de paiment au responsable de vote :<br />
+              <span className="font-semibold">* Orange Money : +237 695965175</span><br />
+              <span className="font-semibold">* MTN Mobile Money : +237 683500188</span><br /><br />
               💡 <span className="font-semibold">Rappel :</span> Votre vote de {voteAmount} fois correspond à un montant de {getAmount(voteAmount)} FCFA.<br /><br />
               Après paiement, conservez votre reçu comme preuve.<br /><br />
-              Un immense merci pour votre participation et votre compréhension ! Ensemble, faisons la différence. 🙌
+              Un immense merci pour votre participation et votre compréhension ! Ensemble, faisons la différence. ✨🧧
             </p>
           </div>
           
