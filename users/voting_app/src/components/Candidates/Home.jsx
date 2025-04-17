@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Heart, X, Check, ChevronRight, Instagram, Facebook, Twitter, Menu, Phone, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
+import TalentInfoBulle from './TalentInfoBulle '; 
+import Talent from './Talent';
 
 // Configuration Supabase
 const SUPABASE_URL = 'https://vdnbkevncovdssvgyrzr.supabase.co';
@@ -33,6 +35,7 @@ const Home = () => {
         const { data, error } = await supabase
           .from('candidates')
           .select('*')
+          .in('type', ['miss', 'master', 'chanteur', 'danseur']) // Inclure les nouveaux types
           .order('number', { ascending: true });
           
         if (error) {
@@ -64,6 +67,8 @@ const Home = () => {
   // Filtrer les candidats par type
   const missCandidates = candidates.filter(candidate => candidate.type === "miss");
   const masterCandidates = candidates.filter(candidate => candidate.type === "master");
+  const chanteurCandidates = candidates.filter(candidate => candidate.type === "chanteur");
+  const danseurCandidates = candidates.filter(candidate => candidate.type === "danseur");
 
   // Gestion du vote
   const handleVoteClick = (candidate) => {
@@ -228,6 +233,9 @@ INSTRUCTIONS:
 
   return (
     <div className="bg-gradient-to-b from-gray-50 to-white min-h-screen">
+        {/* Ajouter le composant InfoBulle ici */}
+        <TalentInfoBulle />
+
       {/* Header */}
       <header className="bg-[#96172E] text-white">
         <div className="container mx-auto">
@@ -402,7 +410,7 @@ INSTRUCTIONS:
         <section id="masters" className="py-12 px-4 bg-white">
           <div className="container mx-auto">
             <div className="text-center mb-8">
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Nos Candidats MASTER 2025</h2>
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Nos Candidats MISTER 2025</h2>
               <p className="text-gray-600 max-w-2xl mx-auto">Découvrez les étudiants candidats représentant les différents départements de HITBAMAS.</p>
             </div>
             
