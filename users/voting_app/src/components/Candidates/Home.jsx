@@ -3,7 +3,7 @@ import { Heart, X, Check, ChevronRight, Instagram, Facebook, Twitter, Menu, Phon
 import { Link } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 import TalentInfoBulle from './TalentInfoBulle '; 
-import Talent from './Talent';
+import WinnersDisplay from './WinnersDisplay';
 
 // Configuration Supabase
 const SUPABASE_URL = 'https://vdnbkevncovdssvgyrzr.supabase.co';
@@ -233,8 +233,8 @@ INSTRUCTIONS:
 
   return (
     <div className="bg-gradient-to-b from-gray-50 to-white min-h-screen">
-        {/* Ajouter le composant InfoBulle ici */}
-        <TalentInfoBulle />
+        {/* Ajouter le composant InfoBulle ici 
+        <TalentInfoBulle />*/}
 
       {/* Header */}
       <header className="bg-[#96172E] text-white">
@@ -340,129 +340,9 @@ INSTRUCTIONS:
         </div>
       )}
 
-      {/* Message d'erreur */}
-      {error && (
-        <div className="bg-red-50 text-red-800 p-4 rounded-md mx-auto max-w-2xl my-8">
-          <p>Une erreur est survenue lors du chargement des candidats: {error}</p>
-        </div>
-      )}
       
-      {/* Section Candidates - MISS */}
-      {!loading && missCandidates.length > 0 && (
-        <section id="candidates" className="py-12 px-4 bg-gray-50">
-          <div className="container mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Nos Candidates MISS 2025</h2>
-              <p className="text-gray-600 max-w-2xl mx-auto">Découvrez les étudiantes candidates représentant les différents départements de HITBAMAS.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-              {missCandidates.map((candidate) => (
-                <div 
-                  key={candidate.id} 
-                  className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow group"
-                >
-                  <Link to={`/candidate/${candidate.id}`} className="block">
-                    <div className="relative">
-                      <img 
-                        src={candidate.photoUrl || '/placeholder.jpg'}
-                        alt={candidate.name} 
-                        className="w-full h-64 object-cover group-hover:opacity-90 transition-opacity"
-                      />
-                      <div className="absolute top-0 left-0 bg-[#96172E] text-white px-3 py-1 font-bold">
-                        N°{candidate.number || '?'}
-                      </div>
-                      <div className="absolute top-0 right-0 bg-white/80 backdrop-blur-sm px-3 py-1 m-2 rounded-full flex items-center space-x-1">
-                        <Heart size={16} className="text-[#96172E]" />
-                        <span className="font-semibold text-gray-800">{candidate.votes || 0}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4">
-                      <h3 className="font-bold text-lg mb-1">{candidate.name}</h3>
-                      <p className="text-gray-600 mb-2 flex items-center text-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-[#96172E]" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
-                        </svg>
-                        {candidate.department || "Département non spécifié"}
-                      </p>
-                    </div>
-                  </Link>
-                  
-                  <div className="px-4 pb-4">
-                    <button 
-                      onClick={() => handleVoteClick(candidate)}
-                      className="w-full py-2 bg-[#96172E] hover:bg-[#7d1427] text-white font-medium rounded transition-colors flex items-center justify-center space-x-2"
-                    >
-                      <Heart size={18} />
-                      <span>Voter</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-      
-      {/* Section Candidates - MASTER */}
-      {!loading && masterCandidates.length > 0 && (
-        <section id="masters" className="py-12 px-4 bg-white">
-          <div className="container mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Nos Candidats MISTER 2025</h2>
-              <p className="text-gray-600 max-w-2xl mx-auto">Découvrez les étudiants candidats représentant les différents départements de HITBAMAS.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-              {masterCandidates.map((candidate) => (
-                <div 
-                  key={candidate.id} 
-                  className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow group"
-                >
-                  <Link to={`/candidate/${candidate.id}`} className="block">
-                    <div className="relative">
-                      <img 
-                        src={candidate.photoUrl || '/placeholder.jpg'}
-                        alt={candidate.name} 
-                        className="w-full h-64 object-cover group-hover:opacity-90 transition-opacity"
-                      />
-                      <div className="absolute top-0 left-0 bg-[#96172E] text-white px-3 py-1 font-bold">
-                        N°{candidate.number || '?'}
-                      </div>
-                      <div className="absolute top-0 right-0 bg-white/80 backdrop-blur-sm px-3 py-1 m-2 rounded-full flex items-center space-x-1">
-                        <Heart size={16} className="text-[#96172E]" />
-                        <span className="font-semibold text-gray-800">{candidate.votes || 0}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4">
-                      <h3 className="font-bold text-lg mb-1">{candidate.name}</h3>
-                      <p className="text-gray-600 mb-2 flex items-center text-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-[#96172E]" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
-                        </svg>
-                        {candidate.department || "Département non spécifié"}
-                      </p>
-                    </div>
-                  </Link>
-                  
-                  <div className="px-4 pb-4">
-                    <button 
-                      onClick={() => handleVoteClick(candidate)}
-                      className="w-full py-2 bg-[#96172E] hover:bg-[#7d1427] text-white font-medium rounded transition-colors flex items-center justify-center space-x-2"
-                    >
-                      <Heart size={18} />
-                      <span>Voter</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-      
+      <WinnersDisplay supabase={supabase} />
+
       {/* Compteurs */}
       {!loading && (
         <section className="py-8 px-4 bg-gray-50">
@@ -479,7 +359,7 @@ INSTRUCTIONS:
                 <p className="text-gray-600 uppercase font-medium text-sm">Votes totaux</p>
               </div>
               <div className="p-4 bg-[#D6B981]/10 rounded-lg">
-                <div className="text-3xl font-bold text-[#96172E] mb-2">1</div>
+                <div className="text-3xl font-bold text-[#96172E] mb-2">Fin</div>
                 <p className="text-gray-600 uppercase font-medium text-sm">Jours restants</p>
               </div>
               <div className="p-4 bg-[#D6B981]/10 rounded-lg">
